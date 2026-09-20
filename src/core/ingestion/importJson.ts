@@ -1,0 +1,16 @@
+type QueryFunction = (sql: string) => Promise<any[]>;
+
+export async function importJson(
+  filePath: string,
+  tableName: string,
+  queryFn: QueryFunction
+): Promise<void> {
+  try {
+    const normalizedPath = filePath.replace(/\\/g, '/').replace(/'/g, "''");
+    if (!normalizedPath) throw new Error('File path is empty');
+    const sql = `CREATE TABLE ${tableName} AS SELECT * FROM read_json_auto('${normalizedPath}')`;
+    await queryFn(sql);
+  } catch (error) {
+    throw new Error(`Failed to import JSON from ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

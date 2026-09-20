@@ -1,0 +1,73 @@
+{
+  "name": "datapulse",
+  "version": "1.0.0",
+  "description": "DataPulse — Offline analytics, instant intelligence.",
+  "main": "dist/main/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "npm run build:preload && tsc -p tsconfig.node.json && electron .",
+    "build": "npm run build:preload && tsc -p tsconfig.node.json && vite build",
+    "build:preload": "tsc -p tsconfig.preload.json",
+    "build:electron": "electron-builder",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "electron",
+    "analytics",
+    "duckdb",
+    "offline"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "duckdb": "^1.4.4",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.5.5",
+    "concurrently": "^9.2.4",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-electron": "^0.28.8"
+  },
+  "allowScripts": {
+    "duckdb@1.4.4": true,
+    "electron@33.4.11": true,
+    "esbuild@0.21.5": true
+  },
+  "build": {
+    "appId": "com.offline.dataintelligence",
+    "productName": "Offline Data Intelligence",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

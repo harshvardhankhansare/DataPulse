@@ -1,0 +1,57 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electron', {
+  selectFile: () => ipcRenderer.invoke('select-file'),
+  selectCsvFile: () => ipcRenderer.invoke('select-file'),
+  importFile: (filePath: string) => ipcRenderer.invoke('import-file', filePath),
+  importCsv: (filePath: string) => ipcRenderer.invoke('import-file', filePath),
+  runAnalysis: (tableName: string, analysisType: string, filter?: any) =>
+    ipcRenderer.invoke('run-analysis', tableName, analysisType, filter),
+  checkAiStatus: (customUrl?: string) =>
+    ipcRenderer.invoke('check-ai-status', customUrl),
+  queryAi: (tableName: string, question: string, customUrl?: string) =>
+    ipcRenderer.invoke('query-ai', tableName, question, customUrl),
+  getSimulationConfig: (tableName: string) =>
+    ipcRenderer.invoke('get-simulation-config', tableName),
+  runSimulation: (tableName: string, targetCol: string, adjustments: Record<string, number>, filter?: any) =>
+    ipcRenderer.invoke('run-simulation', tableName, targetCol, adjustments, filter),
+  scanPii: (tableName: string) =>
+    ipcRenderer.invoke('privacy:scan-pii', tableName),
+  applyMasking: (tableName: string, columnRules: Record<string, any>) =>
+    ipcRenderer.invoke('privacy:apply-masking', tableName, columnRules),
+  revertMasking: (tableName: string) =>
+    ipcRenderer.invoke('privacy:revert-masking', tableName),
+  purgeMemory: () =>
+    ipcRenderer.invoke('privacy:purge-memory'),
+  getAirGapStatus: () =>
+    ipcRenderer.invoke('privacy:get-airgap-status'),
+  getDiagnosticTargets: (tableName: string) =>
+    ipcRenderer.invoke('diagnostic:get-targets', tableName),
+  runDiagnosticInvestigation: (
+    tableName: string,
+    targetCol?: string,
+    dimensionCol?: string,
+    question?: string
+  ) =>
+    ipcRenderer.invoke('diagnostic:investigate', tableName, targetCol, dimensionCol, question),
+  generateBriefing: (
+    tableName: string,
+    fileName?: string,
+    quality?: any,
+    insights?: any[]
+  ) =>
+    ipcRenderer.invoke('reporting:generate-briefing', tableName, fileName, quality, insights),
+  exportBriefingHtml: (briefing: any, chartImages?: Record<string, string>) =>
+    ipcRenderer.invoke('reporting:export-html', briefing, chartImages),
+  exportBriefingPdf: (datasetName?: string) =>
+    ipcRenderer.invoke('reporting:export-pdf', datasetName),
+  selectMultipleFiles: () =>
+    ipcRenderer.invoke('lakehouse:select-files'),
+  importMultipleFiles: (filePaths: string[]) =>
+    ipcRenderer.invoke('lakehouse:import-files', filePaths),
+  detectJoinCandidates: (tables: any[]) =>
+    ipcRenderer.invoke('lakehouse:detect-joins', tables),
+  createJoinView: (plan: any) =>
+    ipcRenderer.invoke('lakehouse:create-join-view', plan),
+});
+

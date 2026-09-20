@@ -1,0 +1,278 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── DataPulse Design Tokens ─────────────────────────── */
+:root {
+  --dp-sidebar-bg:    #0a0e17;
+  --dp-sidebar-hover: #141c2e;
+  --dp-sidebar-active:#1c2742;
+  --dp-sidebar-border:#1a2337;
+  --dp-accent:        #3b82f6;
+  --dp-accent-dim:    #2563eb;
+  --dp-accent-glow:   rgba(59,130,246,0.15);
+  --dp-text-primary:  #f8fafc;
+  --dp-text-muted:    #94a3b8;
+  --dp-surface:       #111726;
+  --dp-surface-2:     #0b0f19;
+  --dp-border:        #1e293b;
+  --dp-border-strong: #334155;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* ─── Base reset ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--dp-surface-2);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--dp-text-primary);
+}
+
+/* ─── Custom scrollbar ────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ─── App Layout ──────────────────────────────────────── */
+.dp-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.dp-sidebar {
+  width: 216px;
+  min-width: 216px;
+  background: var(--dp-sidebar-bg);
+  border-right: 1px solid var(--dp-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+}
+
+.dp-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--dp-surface-2);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.dp-topbar {
+  height: 52px;
+  min-height: 52px;
+  background: #0d121f;
+  border-bottom: 1px solid var(--dp-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dp-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ─── Nav items ───────────────────────────────────────── */
+.dp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  color: #8892a4;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  border-left: 2px solid transparent;
+  margin: 1px 6px 1px 0;
+  border-radius: 0 6px 6px 0;
+  user-select: none;
+  letter-spacing: 0.01em;
+}
+.dp-nav-item:hover {
+  background: var(--dp-sidebar-hover);
+  color: #c8d0e0;
+}
+.dp-nav-item.active {
+  background: var(--dp-sidebar-active);
+  color: #ffffff;
+  border-left-color: var(--dp-accent);
+}
+
+/* ─── Cards ───────────────────────────────────────────── */
+.dp-card {
+  background: var(--dp-surface);
+  border: 1px solid var(--dp-border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* ─── Insight stripe cards ────────────────────────────── */
+.dp-insight-card {
+  background: var(--dp-surface);
+  border: 1px solid var(--dp-border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.dp-insight-card:hover {
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  border-color: #3b82f6;
+}
+.dp-insight-stripe {
+  width: 4px;
+  flex-shrink: 0;
+}
+.dp-insight-body {
+  flex: 1;
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+/* ─── Status dots ─────────────────────────────────────── */
+.dp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dp-dot.online {
+  background: #22c55e;
+  animation: dp-pulse 2.4s infinite;
+}
+.dp-dot.offline { background: #f59e0b; }
+.dp-dot.error   { background: #ef4444; }
+
+/* ─── Animations ──────────────────────────────────────── */
+@keyframes dp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  60%       { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+}
+
+@keyframes dp-fadein {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dp-fadein  { animation: dp-fadein 0.2s ease-out both; }
+.dp-spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(59,130,246,0.25);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: dp-spin 0.75s linear infinite;
+}
+
+/* ─── Code blocks ─────────────────────────────────────── */
+.dp-code {
+  background: #080c14;
+  border: 1px solid #1e2638;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: #7ee787;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* ─── Buttons ─────────────────────────────────────────── */
+.dp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s;
+  border: none;
+  white-space: nowrap;
+}
+.dp-btn:active { transform: scale(0.97); }
+.dp-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.dp-btn-primary { background: var(--dp-accent); color: #fff; }
+.dp-btn-primary:hover:not(:disabled) { background: var(--dp-accent-dim); }
+
+.dp-btn-ghost {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid var(--dp-border);
+  font-weight: 500;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.dp-btn-ghost:hover:not(:disabled) {
+  background: #141c2e;
+  border-color: var(--dp-border-strong);
+  color: #f8fafc;
+}
+
+/* ─── Drop zone ───────────────────────────────────────── */
+.dp-dropzone {
+  border: 1.5px dashed #334155;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.dp-dropzone:hover,
+.dp-dropzone.drag-over {
+  border-color: var(--dp-accent);
+  background: var(--dp-accent-glow);
+}
+
+/* ─── Quality gauge bars ──────────────────────────────── */
+.dp-gauge-track {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.dp-gauge-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.dp-gauge-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─── Print ───────────────────────────────────────────── */
+@media print {
+  .dp-sidebar, .dp-topbar, .no-print { display: none !important; }
+  .dp-main, .dp-content { overflow: visible !important; height: auto !important; }
+  body { background: #fff !important; }
+  .dp-card, .dp-insight-card { break-inside: avoid; }
+  .dp-code { background: #f1f5f9 !important; color: #1e293b !important; }
+}
+

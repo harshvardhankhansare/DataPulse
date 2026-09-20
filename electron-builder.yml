@@ -1,0 +1,11 @@
+appId: com.offline-analytics.app
+productName: Offline Data Intelligence
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+win:
+  target:
+    - nsis

@@ -1,0 +1,82 @@
+[
+  {
+    "sale_id": 1,
+    "product": "Widget A",
+    "quantity": 10,
+    "price": 29.99,
+    "region": "North",
+    "sale_date": "2024-03-01"
+  },
+  {
+    "sale_id": 2,
+    "product": "Gadget B",
+    "quantity": 5,
+    "price": 49.99,
+    "region": "South",
+    "sale_date": "2024-03-02"
+  },
+  {
+    "sale_id": 3,
+    "product": "Tool C",
+    "quantity": 15,
+    "price": 19.99,
+    "region": "East",
+    "sale_date": "2024-03-03"
+  },
+  {
+    "sale_id": 4,
+    "product": "Widget A",
+    "quantity": 8,
+    "price": 29.99,
+    "region": "West",
+    "sale_date": "2024-03-04"
+  },
+  {
+    "sale_id": 5,
+    "product": "Device D",
+    "quantity": 12,
+    "price": 99.99,
+    "region": "North",
+    "sale_date": "2024-03-05"
+  },
+  {
+    "sale_id": 6,
+    "product": "Gadget B",
+    "quantity": 20,
+    "price": 49.99,
+    "region": "South",
+    "sale_date": "2024-03-06"
+  },
+  {
+    "sale_id": 7,
+    "product": "Tool C",
+    "quantity": 7,
+    "price": 19.99,
+    "region": "North",
+    "sale_date": "2024-03-07"
+  },
+  {
+    "sale_id": 8,
+    "product": "Widget A",
+    "quantity": 18,
+    "price": 29.99,
+    "region": "East",
+    "sale_date": "2024-03-08"
+  },
+  {
+    "sale_id": 9,
+    "product": "Device D",
+    "quantity": 3,
+    "price": 99.99,
+    "region": "West",
+    "sale_date": "2024-03-09"
+  },
+  {
+    "sale_id": 10,
+    "product": "Gadget B",
+    "quantity": 25,
+    "price": 49.99,
+    "region": "North",
+    "sale_date": "2024-03-10"
+  }
+]
