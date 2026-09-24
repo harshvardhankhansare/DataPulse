@@ -420,6 +420,122 @@ export function registerIpcHandlers() {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+
+  /* ─── Interactive Data Editor & 1-Click Cleaning Handlers ─── */
+  ipcMain.handle('editor:get-table-rows', async (_event, tableName: string, limit = 50, offset = 0, search = '') => {
+    try {
+      // Get total count
+      const countRes = await query(`SELECT COUNT(*) as total FROM ${tableName}`);
+      const totalCount = Number(countRes[0]?.total ?? 0);
+
+      // Columns list
+      const colRes = await query(`PRAGMA table_info('${tableName}')`);
+      const columns = colRes.map((c: any) => c.name);
+
+      let sql = `SELECT rowid, * FROM ${tableName}`;
+      if (search && search.trim()) {
+        const cleanSearch = search.trim().replace(/'/g, "''");
+        const matchConditions = columns.map((col: string) => `CAST("${col}" AS VARCHAR) ILIKE '%${cleanSearch}%'`);
+        if (matchConditions.length > 0) {
+          sql += ` WHERE (${matchConditions.join(' OR ')})`;
+        }
+      }
+
+      sql += ` LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      const rows = await query(sql);
+      return { success: true, rows, totalCount, columns };
+    } catch (error) {
+      console.error('editor:get-table-rows failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('editor:update-cell', async (_event, tableName: string, rowid: number, column: string, value: any) => {
+    try {
+      const safeCol = column.replace(/"/g, '""');
+      let valSql = 'NULL';
+      if (value !== null && value !== undefined && value !== '') {
+        if (typeof value === 'number') {
+          valSql = String(value);
+        } else {
+          valSql = `'${String(value).replace(/'/g, "''")}'`;
+        }
+      }
+      await query(`UPDATE ${tableName} SET "${safeCol}" = ${valSql} WHERE rowid = ${Number(rowid)}`);
+      return { success: true };
+    } catch (error) {
+      console.error('editor:update-cell failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('editor:delete-row', async (_event, tableName: string, rowid: number) => {
+    try {
+      await query(`DELETE FROM ${tableName} WHERE rowid = ${Number(rowid)}`);
+      return { success: true };
+    } catch (error) {
+      console.error('editor:delete-row failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('editor:clean-data', async (_event, tableName: string, action: string) => {
+    try {
+      if (action === 'remove_duplicates') {
+        const before = await query(`SELECT COUNT(*) as c FROM ${tableName}`);
+        await query(`CREATE OR REPLACE TABLE ${tableName} AS SELECT DISTINCT * FROM ${tableName}`);
+        const after = await query(`SELECT COUNT(*) as c FROM ${tableName}`);
+        const removed = Number(before[0]?.c ?? 0) - Number(after[0]?.c ?? 0);
+        return { success: true, message: `Removed ${removed} duplicate rows.` };
+      } else if (action === 'fill_nulls_zero') {
+        const cols = await query(`PRAGMA table_info('${tableName}')`);
+        let filledCount = 0;
+        for (const col of cols) {
+          const type = String(col.type).toUpperCase();
+          if (type.includes('INT') || type.includes('DOUBLE') || type.includes('FLOAT') || type.includes('DECIMAL') || type.includes('NUMERIC') || type.includes('BIGINT')) {
+            await query(`UPDATE ${tableName} SET "${col.name}" = 0 WHERE "${col.name}" IS NULL`);
+            filledCount++;
+          }
+        }
+        return { success: true, message: `Replaced empty values with 0 in ${filledCount} numeric columns.` };
+      } else if (action === 'trim_spaces') {
+        const cols = await query(`PRAGMA table_info('${tableName}')`);
+        let trimmedCount = 0;
+        for (const col of cols) {
+          const type = String(col.type).toUpperCase();
+          if (type.includes('VARCHAR') || type.includes('TEXT') || type.includes('CHAR')) {
+            await query(`UPDATE ${tableName} SET "${col.name}" = TRIM("${col.name}") WHERE "${col.name}" IS NOT NULL`);
+            trimmedCount++;
+          }
+        }
+        return { success: true, message: `Trimmed extra spaces across ${trimmedCount} text columns.` };
+      }
+      return { success: false, error: 'Unknown cleaning action' };
+    } catch (error) {
+      console.error('editor:clean-data failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('editor:export-csv', async (event, tableName: string, defaultName?: string) => {
+    try {
+      const win = BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow() ?? undefined;
+      const saveResult = await dialog.showSaveDialog(win!, {
+        title: 'Export Cleaned CSV',
+        defaultPath: defaultName ? `cleaned_${defaultName.replace(/\.[^/.]+$/, '')}.csv` : 'cleaned_dataset.csv',
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+      if (saveResult.canceled || !saveResult.filePath) {
+        return { success: false, canceled: true };
+      }
+      const outPath = saveResult.filePath.replace(/\\/g, '/');
+      await query(`COPY ${tableName} TO '${outPath}' (HEADER, DELIMITER ',')`);
+      return { success: true, filePath: outPath };
+    } catch (error) {
+      console.error('editor:export-csv failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
 }
 
 

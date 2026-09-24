@@ -1,134 +1,143 @@
-# DataPulse — Offline Data Intelligence & In-Memory Lakehouse
+# DataPulse — The Intelligent Offline Spreadsheet & Data Studio
 
-> **High-Performance Offline Analytics, In-Memory Lakehouse, Autonomous AI Diagnostics, and Air-Gapped Privacy Vault powered by DuckDB, React 18, and Local LLMs.**
+> **Like a private, intelligent Excel that automatically finds trends, fixes mistakes, tests "what-if" scenarios, and answers questions in plain English — 100% offline, zero cloud, zero data leaves your computer.**
 
 ![DataPulse](https://img.shields.io/badge/DataPulse-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
-![DuckDB](https://img.shields.io/badge/DuckDB-1.4.4-yellow.svg)
-![Electron](https://img.shields.io/badge/Electron-33-47848F.svg)
-![React](https://img.shields.io/badge/React-18-61DAFB.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)
-![Air--Gapped](https://img.shields.io/badge/Security-Air--Gapped-emerald.svg)
+![Security](https://img.shields.io/badge/Privacy-100%25%20Offline%20%7C%20Air--Gapped-emerald.svg)
+![DuckDB](https://img.shields.io/badge/DuckDB-In--Memory%20Engine-yellow.svg)
+![Electron](https://img.shields.io/badge/Desktop-Electron%20%2B%20React-47848F.svg)
 
 ---
 
-## 🌟 Overview
+### 💡 If You Need to Explain This Project to a Teacher, Recruiter, or Normal Person:
 
-**DataPulse** is a zero-latency, 100% offline desktop intelligence suite designed for data engineers, analysts, and decision-makers working in restricted, high-compliance, or privacy-critical environments. 
-
-By executing directly inside an embedded **in-memory columnar DuckDB OLAP engine**, DataPulse processes millions of rows in sub-5ms latency with **zero cloud dependencies, zero external database servers, and zero network telemetry**.
-
----
-
-## 🚀 Key Features
-
-### 🔀 1. Offline Relational Lakehouse & Smart Auto-Join
-* Ingest mixed-format datasets simultaneously (**CSV, XLSX, JSON, Parquet**).
-* **Automatic Foreign Key Detection**: Heuristic and probabilistic key matching (`id` ↔ `customer_id`, `sku`, `user_id`) using sub-5ms DuckDB set intersection (`INTERSECT`) to calculate real overlap percentages.
-* **Visual Join Studio**: Select join types (`LEFT`, `INNER`, `FULL`, `RIGHT`) and instantly compile unified in-memory warehouse views with automatic column disambiguation.
-
-### 🎯 2. Click-to-Drill Cross-Filtering
-* Interactive chart slicing on Donut slices, Bar charts, Pie segments, and Funnel stages.
-* Global context synchronization that parameterizes all analytical queries across distribution statistics, time series, and correlations in real-time.
-* Automatic hierarchical drill-downs into secondary categorical dimensions.
-
-### 🧪 3. "What-If" Scenario Simulator & Driver Sensitivity
-* **Automatic Lever Detection**: Identifies business targets (Revenue, Profit, Sales) and controllable drivers (Price, Volume, Discount %, Cost).
-* **Elasticity Ranking & Tornado Chart**: Perturbs drivers by $+10\%$ to compute partial derivative elasticity.
-* **Compounded In-Memory Projections**: Dynamic SQL calculations with range sliders ($-50\%$ to $+100\%$) and presets (*Aggressive Growth*, *Conservative*, *Stress Test*).
-
-### 🛡️ 4. Air-Gapped Privacy Vault & PII Redaction
-* **Automated PII Scanner**: Regex and semantic header detection for Emails, Phone Numbers, Credit Cards, SSNs, IP Addresses, and Names.
-* **Compliance Tagging**: Automated risk assessments for GDPR, HIPAA, PCI-DSS, and SOC-2 Type II.
-* **SQL Masking Views**: Transparent in-memory masking with partial masking, full redaction, or cryptographic hashes.
-* **Volatile Memory Zeroizer**: Native memory purger executing DuckDB `CHECKPOINT` and V8 garbage collection to guarantee zero data remanence upon exit.
-
-### 🧠 5. Autonomous Diagnostic AI Agent
-* **Multi-Step Root-Cause Engine**: Executes a 3-step chained investigation (Macro Scan ➔ Variance Decomposition ➔ Secondary Factor Isolation).
-* **Mathematical Variance Attribution**: Normalizes cohort drags and lifts.
-* **ECharts Waterfall Bridge**: Visualizes positive drivers and negative drags connecting baseline to current periods.
-* **Strategic Next Steps**: Formulates executive operational directives backed by SQL audit receipts.
-
-### 📑 6. Executive Briefing & 1-Click Presentation Generator
-* **C-Suite Narrative Synthesis**: Automated generation of macro KPI scorecards, strategic findings, and variance summaries.
-* **Standalone Zero-Dependency HTML Export**: Exports self-contained, offline-viewable interactive HTML dashboards.
-* **Corporate PDF Export**: Native Electron print-to-PDF formatting tailored for executive presentations.
-
-### 🤖 7. Local AI Natural Language Query (LM Studio / Ollama)
-* Ask plain-English questions to query datasets directly.
-* Connects locally to **LM Studio** or **Ollama** (`http://127.0.0.1:1234/v1` or `http://127.0.0.1:11434/v1`).
-* **AST SQL Guardrails**: Strictly validates and sandboxes AI queries, enforcing read-only execution.
+| Complicated Technical Term | Plain English (What it actually means) |
+| :--- | :--- |
+| **"Air-gapped Zero-Cloud Architecture"** | **Your files never leave your computer.** Safe for private company or personal data. |
+| **"DuckDB Columnar Lakehouse Engine"** | **It handles huge files instantly without freezing or lagging.** |
+| **"Automated Exploratory Data Analysis & Outliers"** | **It finds mistakes, strange numbers, and key trends for you automatically.** |
+| **"Scenario Elasticity Simulator"** | **A "What-If" slider tool** (e.g., *"What happens to profit if I increase prices by 10%?"*). |
+| **"Local LLM Natural Language SQL Agent"** | **You can just ask questions in plain English** (e.g., *"Show top 5 customers"*), and it gives you the answer. |
+| **"Interactive In-App Data Cleaning"** | **Double-click any cell to fix typos, delete bad rows, and export a clean CSV.** |
 
 ---
 
-## 🛠️ Technology Stack
+## 🎯 Why Was DataPulse Built?
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Desktop Shell** | [Electron 33](https://www.electronjs.org/) | Cross-platform desktop runtime with strict IPC isolation |
-| **Language** | [TypeScript 5.6](https://www.typescriptlang.org/) | End-to-end type safety across Main, Core, and Renderer |
-| **Analytics Engine** | [DuckDB 1.4](https://duckdb.org/) | Embedded in-process columnar OLAP database in RAM |
-| **Frontend UI** | [React 18](https://react.dev/) + [Vite 5](https://vitejs.dev/) | Lightning-fast reactive component tree and HMR bundling |
-| **Visualization** | [Apache ECharts 6](https://echarts.apache.org/) | High-performance Canvas/SVG interactive chart rendering |
-| **Spreadsheet Engine** | [SheetJS (xlsx)](https://sheetjs.com/) | High-speed offline Excel workbook parser |
-| **State Management** | [Zustand 5](https://github.com/pmndrs/zustand) | Minimalistic, reactive state container |
-| **Styling** | [Tailwind CSS](https://tailwindcss.com/) + CSS Tokens | Custom executive dark theme design system |
+1. **Most people don't know how to write code or SQL:** Business owners, students, and managers just want clear charts and direct answers from their files without writing Python scripts.
+2. **Uploading company data to ChatGPT is a privacy risk:** Companies strictly forbid uploading confidential sales, customer, or financial data to online AI services. DataPulse works **100% offline with zero internet access**.
+3. **Excel freezes on large files:** When you open a 200,000+ row file in Excel, your computer slows to a crawl. DataPulse uses an ultra-fast in-memory engine that processes large files in milliseconds.
 
 ---
 
-## ⚡ Quick Start
+## 🚀 What Can You Do in DataPulse?
+
+### 1. 📊 Interactive Data Table & 1-Click Cleaner
+* **Browse your actual data**: View all rows with instant search and pagination.
+* **Double-click to edit**: Fix typos or replace wrong numbers directly inside the grid.
+* **1-Click Cleaning Tools**:
+  * 🧹 **Remove Duplicates**: Instantly scans your file and removes duplicate rows.
+  * 🩹 **Fill Empty Cells**: Replaces missing numbers with zeros in one click.
+  * ✂️ **Trim Extra Spaces**: Cleans up trailing and leading spaces from names and text.
+* **Export Cleaned CSV**: Download your cleaned, updated file with a single click.
+
+### 2. 📈 Visual Charts & Key Patterns
+* The second you drop a file (CSV, Excel `.xlsx`, JSON, or Parquet), DataPulse automatically creates interactive charts.
+* **Click-to-Filter**: Click on any slice of a chart (e.g., *"Electronics"* or *"North America"*) and the entire dashboard instantly updates to show only that category.
+
+### 3. 🎛️ What-If Business Calculator
+* Move interactive sliders (e.g., *Price $+10\%$*, *Volume $-5\%$*, *Discount $+2\%$*) to see hypothetical future outcomes on your revenue or profit.
+* Pre-set buttons for **"Growth Strategy"**, **"Cost Reduction"**, and **"Stress Test"**.
+
+### 4. 🔍 Problem Finder (Why Did It Happen?)
+* Instead of guessing why numbers changed, the Diagnostic Assistant automatically investigates the drivers behind sudden drops or peaks.
+* Produces clear visual waterfall charts explaining what factors caused the change.
+
+### 5. 💡 Key Findings in Plain English
+* No confusing statistical equations. DataPulse writes simple bullet points like:
+  * *“💡 Key Finding: 74% of revenue comes from just 2 product categories.”*
+  * *“⚠️ Warning: There are 18 extreme outliers in the pricing column.”*
+
+### 6. 📑 1-Page Summary Report & PDF Export
+* Ready-to-present executive summary with top KPIs, scorecards, and highlights.
+* Print or save directly to PDF for team meetings and executive reviews.
+
+### 7. 🛡️ Protect Sensitive Customer Information
+* Automatically detects private information (names, emails, phone numbers, credit card numbers).
+* Offers 1-click anonymization (hashing or masking with `***`) and a zero-trace memory purge so no sensitive data remains in memory.
+
+### 8. 💬 Ask Questions in Plain English
+* Ask natural questions like:
+  * *"Show me the top 5 customers by sales"*
+  * *"Compare average order value across regions"*
+* Powered by optional local AI models (via Ollama or LM Studio) running entirely offline on your own machine.
+
+---
+
+## ⚡ How to Run DataPulse on Your Computer
 
 ### Prerequisites
-* **Node.js**: `v20+` or `v22+` recommended
-* **npm**: `v9+` or `v10+`
+* [Node.js](https://nodejs.org/) (Version 18, 20, or 22)
+* npm (comes with Node.js)
 
-### Installation
+### Quick Start
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/OfflineDataIntelligence.git
+# 1. Clone this repository
+git clone https://github.com/harshvardhankhansare/DataPulse.git
 
-# Navigate into the project directory
-cd OfflineDataIntelligence
+# 2. Open the folder
+cd DataPulse
 
-# Install dependencies
+# 3. Install packages
 npm install
-```
 
-### Development
-```bash
-# Start Vite and Electron concurrently in development mode
-npm run dev
-```
-
-### Building for Production
-```bash
-# Run strict TypeScript type verification
-npm run type-check
-
-# Compile production bundles for Renderer and Main process
-npm run build
-
-# Launch production build
+# 4. Launch the application
 npm start
 ```
 
-### Packaging Desktop Installer
-```bash
-# Package as standalone OS installer (.exe / .dmg / .AppImage)
-npm run build:electron
-```
-
 ---
 
-## 🔒 Security & Air-Gapped Privacy Guarantee
+## 🏗️ For Developers & Engineers: Technical Architecture
 
-* **100% Offline Execution**: All queries, statistical aggregations, and joins run in your local system's RAM via embedded DuckDB.
-* **Zero Telemetry**: No tracking, analytics pings, or cloud API calls are made.
-* **AST SQL Validator**: Restricts AI queries to verified read-only `SELECT` statements with parameter validation.
-* **Volatile Memory Sanitization**: Drops views, calls DuckDB `CHECKPOINT`, and invokes garbage collection to purge memory upon request or session termination.
+For those interested in the under-the-hood systems engineering:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   Electron Desktop App                 │
+│                                                        │
+│   ┌────────────────────────────────────────────────┐   │
+│   │       React 18 + TypeScript + Vite UI          │   │
+│   │   (Data Editor, ECharts, Interactive Sliders)  │   │
+│   └──────────────────────┬─────────────────────────┘   │
+│                          │ ContextBridge (Isolated)    │
+│   ┌──────────────────────▼─────────────────────────┐   │
+│   │             IPC Controller Handlers            │   │
+│   └──────────────────────┬─────────────────────────┘   │
+│                          │                             │
+│   ┌──────────────────────▼─────────────────────────┐   │
+│   │           Embedded DuckDB OLAP Engine          │   │
+│   │  - In-memory columnar storage                  │   │
+│   │  - Multi-file Relational Lakehouse (JOINs)     │   │
+│   │  - Row-level mutations & SQL analytics         │   │
+│   │  - Sub-5ms query execution                     │   │
+│   └────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────┘
+```
+
+| Layer | Technology | Role |
+| :--- | :--- | :--- |
+| **Desktop Runtime** | Electron 33 | Sandboxed desktop application shell with zero web exposure |
+| **Language** | TypeScript 5.6 | 100% strict type safety across Main, Core, and UI layers |
+| **Database Engine** | DuckDB 1.4 | Embedded in-memory columnar database |
+| **User Interface** | React 18 + Vite 5 | Reactive UI with custom executive dark theme |
+| **Visual Charts** | Apache ECharts | High-performance Canvas/SVG interactive chart rendering |
+| **Spreadsheet Engine** | SheetJS (`xlsx`) | Fast local Excel file parsing |
+| **Local AI (Optional)** | Ollama / LM Studio | Local LLM inference for natural language query generation |
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+Created with ❤️ by **Harshvardhan Khansare**.

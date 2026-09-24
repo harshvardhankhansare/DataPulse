@@ -16,6 +16,7 @@ import SimulationPanel from './components/SimulationPanel';
 import PrivacyVaultPanel from './components/PrivacyVaultPanel';
 import DiagnosticAgentPanel from './components/DiagnosticAgentPanel';
 import ExecutiveBriefingPanel from './components/ExecutiveBriefingPanel';
+import DataEditor from './components/DataEditor';
 
 /* ─── SVG Icons (inline, no external dep) ───────────────── */
 const IconBriefcase = () => (
@@ -83,14 +84,14 @@ const IconPrint = () => (
 type TabId = 'overview' | 'analytics' | 'simulation' | 'diagnostic' | 'insights' | 'briefing' | 'privacy' | 'ai';
 
 const NAV_ITEMS: { id: TabId; label: string; Icon: React.FC }[] = [
-  { id: 'overview',   label: 'Overview',           Icon: IconGrid },
-  { id: 'analytics',  label: 'Analytics',          Icon: IconBarChart },
-  { id: 'simulation', label: 'Simulation',         Icon: IconSliders },
-  { id: 'diagnostic', label: 'Diagnostic Agent',   Icon: IconBrain },
-  { id: 'insights',   label: 'Insights',           Icon: IconLightbulb },
-  { id: 'briefing',   label: 'Executive Briefing', Icon: IconBriefcase },
-  { id: 'privacy',    label: 'Privacy Vault',      Icon: IconShield },
-  { id: 'ai',         label: 'AI Query',           Icon: IconCpu },
+  { id: 'overview',   label: 'Data & Editor',           Icon: IconGrid },
+  { id: 'analytics',  label: 'Visual Charts',           Icon: IconBarChart },
+  { id: 'simulation', label: 'What-If Calculator',      Icon: IconSliders },
+  { id: 'diagnostic', label: 'Problem Finder',          Icon: IconBrain },
+  { id: 'insights',   label: 'Key Findings',            Icon: IconLightbulb },
+  { id: 'briefing',   label: 'Summary Report',          Icon: IconBriefcase },
+  { id: 'privacy',    label: 'Hide Sensitive Info',     Icon: IconShield },
+  { id: 'ai',         label: 'Ask AI (Plain English)',  Icon: IconCpu },
 ];
 
 function App() {
@@ -101,6 +102,7 @@ function App() {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [overviewMode, setOverviewMode] = useState<'editor' | 'blueprint'>('editor');
   const [fileName, setFileName] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ActiveFilter | null>(null);
 
@@ -292,30 +294,94 @@ function App() {
             <EmptyState />
           ) : (
             <>
-              {/* Overview Tab */}
+              {/* Data & Editor Tab */}
               {activeTab === 'overview' && (
-                <div className="dp-fadein" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <SectionHeader
-                    title="Dataset Overview"
-                    subtitle={`Schema profiling and data quality analysis for ${fileName || schema?.tableName}`}
-                  />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    {quality && <QualityCard quality={quality} />}
-                    <AnalysisList analyses={applicableAnalyses} />
+                <div className="dp-fadein" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                    <SectionHeader
+                      title="Data Table & Quick Clean"
+                      subtitle={`View, double-click to edit values, delete errors, and export clean data (${fileName || schema?.tableName})`}
+                    />
+
+                    {/* View Switcher: Data Editor vs Blueprint */}
+                    <div style={{
+                      display: 'flex',
+                      background: '#141c2e',
+                      border: '1px solid #1e293b',
+                      borderRadius: 8,
+                      padding: 3,
+                      gap: 4
+                    }}>
+                      <button
+                        onClick={() => setOverviewMode('editor')}
+                        style={{
+                          background: overviewMode === 'editor' ? '#3b82f6' : 'transparent',
+                          color: overviewMode === 'editor' ? '#ffffff' : '#94a3b8',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        📊 Data Rows & Editor
+                      </button>
+                      <button
+                        onClick={() => setOverviewMode('blueprint')}
+                        style={{
+                          background: overviewMode === 'blueprint' ? '#3b82f6' : 'transparent',
+                          color: overviewMode === 'blueprint' ? '#ffffff' : '#94a3b8',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        📋 Column Health & Blueprint
+                      </button>
+                    </div>
                   </div>
-                  {schema && <SchemaTable schema={schema} />}
+
+                  {overviewMode === 'editor' && schema && (
+                    <DataEditor
+                      schema={schema}
+                      fileName={fileName}
+                      onDataChanged={() => {
+                        // Re-trigger analytics reload if needed
+                        setActiveFilter(f => f ? { ...f } : null);
+                      }}
+                    />
+                  )}
+
+                  {overviewMode === 'blueprint' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                        {quality && <QualityCard quality={quality} />}
+                        <AnalysisList analyses={applicableAnalyses} />
+                      </div>
+                      {schema && <SchemaTable schema={schema} />}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Analytics Tab */}
+              {/* Visual Charts Tab */}
               {activeTab === 'analytics' && (
                 <div className="dp-fadein">
-                  <SectionHeader title="Statistical Analytics" subtitle="Auto-generated charts from DuckDB analysis queries — click any chart slice to cross-filter" />
+                  <SectionHeader
+                    title="Visual Charts & Patterns"
+                    subtitle="Automatic charts showing distributions, correlations, and key patterns in your numbers (click any chart slice to filter)"
+                  />
                   {activeFilter && (
                     <ActiveFilterBanner filter={activeFilter} onClear={() => setActiveFilter(null)} />
                   )}
                   {loadingAnalytics ? (
-                    <LoadingState message="Running filtered analytics queries in DuckDB…" />
+                    <LoadingState message="Creating your charts..." />
                   ) : charts.length > 0 ? (
                     <ChartGrid charts={charts} onFilterSelect={handleFilterSelect} activeFilter={activeFilter} />
                   ) : (
@@ -324,12 +390,12 @@ function App() {
                 </div>
               )}
 
-              {/* Simulation Tab */}
+              {/* What-If Calculator Tab */}
               {activeTab === 'simulation' && schema && (
                 <div className="dp-fadein">
                   <SectionHeader
-                    title="What-If Scenario Simulator & Sensitivity"
-                    subtitle="Interactive operational levers with live DuckDB recalculation and elasticity rankings"
+                    title="What-If Calculator"
+                    subtitle="Move the sliders to see what happens when you adjust prices, expenses, or volume"
                   />
                   {activeFilter && (
                     <ActiveFilterBanner filter={activeFilter} onClear={() => setActiveFilter(null)} />
@@ -338,26 +404,29 @@ function App() {
                 </div>
               )}
 
-              {/* Diagnostic Agent Tab */}
+              {/* Problem Finder Tab */}
               {activeTab === 'diagnostic' && schema && (
                 <div className="dp-fadein">
                   <SectionHeader
-                    title="Autonomous Diagnostic AI Agent"
-                    subtitle="Multi-step root-cause engine isolating variance drivers and mathematical elasticity across cohorts"
+                    title="Problem Finder (Why Did It Happen?)"
+                    subtitle="Investigate the exact reasons and drivers behind sudden spikes or drops in your numbers"
                   />
                   <DiagnosticAgentPanel schema={schema} />
                 </div>
               )}
 
-              {/* Insights Tab */}
+              {/* Key Findings Tab */}
               {activeTab === 'insights' && (
                 <div className="dp-fadein">
-                  <SectionHeader title="Evidence-Backed Insights" subtitle="Deterministic insights derived from SQL analytics — each fully verifiable" />
+                  <SectionHeader
+                    title="Key Findings & Takeaways"
+                    subtitle="Important takeaways written in plain English, backed directly by your data"
+                  />
                   {activeFilter && (
                     <ActiveFilterBanner filter={activeFilter} onClear={() => setActiveFilter(null)} />
                   )}
                   {loadingAnalytics ? (
-                    <LoadingState message="Synthesizing insights from query results…" />
+                    <LoadingState message="Discovering findings from your data..." />
                   ) : insights.length > 0 ? (
                     <InsightList insights={insights} />
                   ) : (
@@ -366,12 +435,12 @@ function App() {
                 </div>
               )}
 
-              {/* Executive Briefing Tab */}
+              {/* Summary Report Tab */}
               {activeTab === 'briefing' && schema && (
                 <div className="dp-fadein">
                   <SectionHeader
-                    title="Executive Intelligence Briefing"
-                    subtitle="C-suite synthesis, macro KPI scorecards, and 1-click standalone presentation exports"
+                    title="Summary Report"
+                    subtitle="A clean 1-page summary report with scorecards and key metrics, ready to print or save"
                   />
                   <ExecutiveBriefingPanel
                     schema={schema}
@@ -382,12 +451,12 @@ function App() {
                 </div>
               )}
 
-              {/* Privacy Vault Tab */}
+              {/* Hide Sensitive Info Tab */}
               {activeTab === 'privacy' && schema && (
                 <div className="dp-fadein">
                   <SectionHeader
-                    title="Air-Gapped Privacy Vault & PII Anonymizer"
-                    subtitle="Automated sensitive entity detection, 1-click DuckDB RAM anonymization, and memory purging"
+                    title="Hide Sensitive Information"
+                    subtitle="Automatically find and mask private information like names, emails, and phone numbers"
                   />
                   <PrivacyVaultPanel
                     schema={schema}
@@ -405,10 +474,13 @@ function App() {
                 </div>
               )}
 
-              {/* AI Query Tab */}
+              {/* Ask AI in Plain English Tab */}
               {activeTab === 'ai' && schema && (
                 <div className="dp-fadein">
-                  <SectionHeader title="AI Natural Language Query" subtitle="Ask questions in plain English — your local model generates DuckDB SQL" />
+                  <SectionHeader
+                    title="Ask Questions in Plain English"
+                    subtitle="Type questions like 'Who are the top 5 customers?' or 'Show sales by month' to get instant answers"
+                  />
                   <AiQueryPanel schema={schema} />
                 </div>
               )}

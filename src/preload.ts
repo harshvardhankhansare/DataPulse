@@ -53,5 +53,15 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('lakehouse:detect-joins', tables),
   createJoinView: (plan: any) =>
     ipcRenderer.invoke('lakehouse:create-join-view', plan),
+  getTableRows: (tableName: string, limit?: number, offset?: number, search?: string) =>
+    ipcRenderer.invoke('editor:get-table-rows', tableName, limit, offset, search),
+  updateCell: (tableName: string, rowid: number, column: string, value: any) =>
+    ipcRenderer.invoke('editor:update-cell', tableName, rowid, column, value),
+  deleteRow: (tableName: string, rowid: number) =>
+    ipcRenderer.invoke('editor:delete-row', tableName, rowid),
+  cleanData: (tableName: string, action: string) =>
+    ipcRenderer.invoke('editor:clean-data', tableName, action),
+  exportCleanedCsv: (tableName: string, defaultName?: string) =>
+    ipcRenderer.invoke('editor:export-csv', tableName, defaultName),
 });
 

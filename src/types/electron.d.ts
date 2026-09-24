@@ -143,6 +143,32 @@ export interface ElectronAPI {
     error?: string;
   }>;
   createJoinView: (plan: JoinPlan) => Promise<JoinViewResult>;
+  getTableRows: (tableName: string, limit?: number, offset?: number, search?: string) => Promise<{
+    success: boolean;
+    rows?: any[];
+    totalCount?: number;
+    columns?: string[];
+    error?: string;
+  }>;
+  updateCell: (tableName: string, rowid: number, column: string, value: any) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  deleteRow: (tableName: string, rowid: number) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  cleanData: (tableName: string, action: 'remove_duplicates' | 'fill_nulls_zero' | 'trim_spaces') => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
+  exportCleanedCsv: (tableName: string, defaultName?: string) => Promise<{
+    success: boolean;
+    filePath?: string;
+    canceled?: boolean;
+    error?: string;
+  }>;
 }
 
 declare global {
