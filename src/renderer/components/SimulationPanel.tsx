@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
 import { TableSchema } from '@core/schema/schemaTypes';
 import { ActiveFilter } from '@core/analytics/filterTypes';
@@ -16,7 +16,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   const [simResult, setSimResult] = useState<SimulationResult | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const tornadoChartRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const echartsInstanceRef = useRef<echarts.ECharts | null>(null);
 
   // 1. Fetch simulation configuration (drivers & candidate targets)
@@ -29,7 +29,6 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         if (res.success && res.config) {
           setConfig(res.config);
           setTargetCol(res.config.targetColumn);
-          // initialize 0% adjustment for each driver
           const initialAdj: Record<string, number> = {};
           res.config.drivers.forEach(d => {
             initialAdj[d.name] = 0;
@@ -66,70 +65,76 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
     executeSimulation();
   }, [schema.tableName, targetCol, adjustments, activeFilter]);
 
-  // 3. Render ECharts Sensitivity Tornado Chart
+  // 3. Render Comparison & Contribution Chart
   useEffect(() => {
-    if (!tornadoChartRef.current || !simResult || simResult.sensitivity.length === 0) return;
+    if (!chartRef.current || !simResult) return;
 
     if (!echartsInstanceRef.current) {
-      echartsInstanceRef.current = echarts.init(tornadoChartRef.current);
+      echartsInstanceRef.current = echarts.init(chartRef.current);
     }
     const chart = echartsInstanceRef.current;
 
-    const sortedDrivers = [...simResult.sensitivity].reverse();
+    const isGain = simResult.deltaTotal >= 0;
 
     const option: echarts.EChartsOption = {
-      backgroundColor: '#0f1117',
+      backgroundColor: '#111726',
       title: {
-        text: 'Driver Elasticity Ranking (+10% Standard Shift Impact)',
+        text: 'Baseline vs. Projected Outcome',
         left: 16,
-        top: 12,
-        textStyle: { color: '#f1f5f9', fontSize: 13, fontWeight: 700 },
+        top: 14,
+        textStyle: { color: '#f8fafc', fontSize: 13, fontWeight: 700 },
       },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        backgroundColor: '#1e2440',
+        backgroundColor: '#141c2e',
         borderColor: '#3b82f6',
-        textStyle: { color: '#f8fafc', fontSize: 13 },
+        textStyle: { color: '#f8fafc', fontSize: 12 },
         formatter: (params: any) => {
           const p = Array.isArray(params) ? params[0] : params;
-          return `<b>${p.name}</b><br/>Marginal (+10%) Shift: <b style="color:#38bdf8;font-size:15px">+${Number(p.value).toLocaleString()}</b>`;
+          return `<b>${p.name}</b><br/>Value: <b style="color:#60a5fa">${Number(p.value).toLocaleString()}</b>`;
         },
       },
-      grid: { left: '22%', right: '12%', top: 50, bottom: 25 },
+      grid: { left: '16%', right: '10%', top: 55, bottom: 30 },
       xAxis: {
-        type: 'value',
-        axisLabel: { color: '#cbd5e1', fontSize: 11 },
-        splitLine: { lineStyle: { color: '#1e2337' } },
+        type: 'category',
+        data: ['Current Baseline', 'Simulated Future'],
+        axisLabel: { color: '#94a3b8', fontSize: 12, fontWeight: 600 },
+        axisLine: { lineStyle: { color: '#1e293b' } },
       },
       yAxis: {
-        type: 'category',
-        data: sortedDrivers.map(d => d.driverName.replace(/_/g, ' ')),
+        type: 'value',
         axisLabel: {
-          color: '#f8fafc',
-          fontSize: 12,
-          fontWeight: 600,
+          color: '#94a3b8',
+          fontSize: 11,
+          formatter: (v: number) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)),
         },
-        axisLine: { lineStyle: { color: '#2d3348' } },
+        splitLine: { lineStyle: { color: '#1a2234' } },
       },
       series: [
         {
           type: 'bar',
-          data: sortedDrivers.map((d, i) => ({
-            value: d.impactPerTenPercent,
-            itemStyle: {
-              color: i === sortedDrivers.length - 1 ? '#3b82f6' : '#6366f1',
-              borderRadius: [0, 4, 4, 0],
+          data: [
+            {
+              value: simResult.baselineTotal,
+              itemStyle: { color: '#475569', borderRadius: [6, 6, 0, 0] },
             },
-          })),
-          barMaxWidth: 24,
+            {
+              value: simResult.projectedTotal,
+              itemStyle: {
+                color: isGain ? '#10b981' : '#ef4444',
+                borderRadius: [6, 6, 0, 0],
+              },
+            },
+          ],
+          barMaxWidth: 56,
           label: {
             show: true,
-            position: 'right',
-            color: '#ffffff',
+            position: 'top',
+            color: '#f8fafc',
             fontSize: 12,
             fontWeight: 700,
-            formatter: (p: any) => `+${Number(p.value).toLocaleString()}`,
+            formatter: (p: any) => Number(p.value).toLocaleString(),
           },
         },
       ],
@@ -148,26 +153,33 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
     }));
   };
 
-  const resetAllSliders = () => {
-    if (!config) return;
-    const reset: Record<string, number> = {};
-    config.drivers.forEach(d => {
-      reset[d.name] = 0;
-    });
-    setAdjustments(reset);
-  };
+  const applyPreset = (presetType: 'reset' | 'growth' | 'conservative' | 'stress') => {
+    if (!config || !simResult) return;
+    const newAdj: Record<string, number> = {};
 
-  // Top driver recommendation
-  const topDriver = useMemo(() => {
-    if (!simResult || simResult.sensitivity.length === 0) return null;
-    return simResult.sensitivity[0];
-  }, [simResult]);
+    config.drivers.forEach(d => {
+      const sens = simResult.sensitivity.find(s => s.driverName === d.name);
+      const isPositive = (sens?.correlation ?? 0) >= 0;
+
+      if (presetType === 'reset') {
+        newAdj[d.name] = 0;
+      } else if (presetType === 'growth') {
+        newAdj[d.name] = isPositive ? 20 : -10;
+      } else if (presetType === 'conservative') {
+        newAdj[d.name] = isPositive ? 5 : -5;
+      } else if (presetType === 'stress') {
+        newAdj[d.name] = isPositive ? -15 : 10;
+      }
+    });
+
+    setAdjustments(newAdj);
+  };
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '40px 0', color: '#64748b', fontSize: 13 }}>
         <span className="dp-spinner" />
-        Configuring simulation model in DuckDB…
+        Configuring statistical simulation model...
       </div>
     );
   }
@@ -175,7 +187,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   if (!config || config.drivers.length === 0) {
     return (
       <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-        No numeric drivers detected for simulation in this dataset.
+        No numeric metrics available for simulation in this dataset.
       </div>
     );
   }
@@ -183,44 +195,45 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   const isPositiveDelta = (simResult?.deltaTotal ?? 0) >= 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Target Outcome Selector */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* ─── Top Control Header & Presets ─── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: 12,
-        background: '#ffffff',
-        padding: '14px 20px',
+        background: '#111726',
+        padding: '14px 18px',
         borderRadius: 10,
-        border: '1px solid #e2e8f0',
+        border: '1px solid #1e293b',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 18 }}>🎯</span>
+          <span style={{ fontSize: 20 }}>🎯</span>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
-              Projected Target Metric
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+              Metric to Predict:
             </div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>
-              Choose which business outcome to forecast across simulated scenarios
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+              Select which business metric changes as you move the sliders
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <select
             value={targetCol}
             onChange={(e) => setTargetCol(e.target.value)}
             style={{
-              padding: '6px 14px',
+              padding: '7px 14px',
               borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#0f172a',
-              background: '#ffffff',
+              border: '1px solid #3b82f6',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#60a5fa',
+              background: '#141c2e',
               cursor: 'pointer',
+              outline: 'none',
               fontFamily: 'monospace',
             }}
           >
@@ -231,26 +244,77 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
             ))}
           </select>
 
-          <button
-            onClick={resetAllSliders}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 6,
-              border: '1px solid #e2e8f0',
-              background: '#f8fafc',
-              color: '#475569',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.12s',
-            }}
-          >
-            ↺ Reset Sliders
-          </button>
+          {/* Quick Presets */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => applyPreset('reset')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 6,
+                border: '1px solid #1e293b',
+                background: '#141c2e',
+                color: '#cbd5e1',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Reset all sliders to 0%"
+            >
+              🔄 Reset (0%)
+            </button>
+            <button
+              onClick={() => applyPreset('growth')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 6,
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Boost positive drivers by +20% and reduce drag"
+            >
+              🚀 Growth (+20%)
+            </button>
+            <button
+              onClick={() => applyPreset('conservative')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 6,
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#93c5fd',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Modest +5% shift"
+            >
+              🛡️ Conservative (+5%)
+            </button>
+            <button
+              onClick={() => applyPreset('stress')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 6,
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#f87171',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Simulate a market downturn (-15%)"
+            >
+              📉 Stress Test (-15%)
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Hero Projection Scorecard */}
+      {/* ─── Hero Scorecards (Top) ─── */}
       {simResult && (
         <div style={{
           display: 'grid',
@@ -259,49 +323,47 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         }}>
           {/* Baseline Card */}
           <div style={{
-            background: '#0f1117',
-            border: '1px solid #1e2337',
-            borderRadius: 12,
-            padding: '18px 20px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            background: '#111726',
+            border: '1px solid #1e293b',
+            borderRadius: 10,
+            padding: '16px 20px',
           }}>
             <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Historical Baseline
+              Current Historical Total
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace', marginTop: 6 }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace', marginTop: 4 }}>
               {Number(simResult.baselineTotal).toLocaleString()}
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-              Average per record: <b>{Number(simResult.baselineAvg).toLocaleString()}</b>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+              Historical average per row: <b>{Number(simResult.baselineAvg).toLocaleString()}</b>
             </div>
           </div>
 
           {/* Projected Outcome Card */}
           <div style={{
-            background: '#0f1117',
+            background: '#111726',
             border: '1px solid #3b82f6',
-            borderRadius: 12,
-            padding: '18px 20px',
-            boxShadow: '0 4px 20px rgba(59,130,246,0.25)',
+            borderRadius: 10,
+            padding: '16px 20px',
+            boxShadow: '0 4px 18px rgba(59,130,246,0.18)',
           }}>
             <div style={{ color: '#60a5fa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Projected Outcome
+              Simulated Future Total
             </div>
-            <div style={{ fontSize: 32, fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace', marginTop: 6 }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace', marginTop: 4 }}>
               {Number(simResult.projectedTotal).toLocaleString()}
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-              Projected avg: <b>{Number(simResult.projectedAvg).toLocaleString()}</b>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
+              Projected average per row: <b>{Number(simResult.projectedAvg).toLocaleString()}</b>
             </div>
           </div>
 
           {/* Simulated Delta Card */}
           <div style={{
-            background: '#0f1117',
+            background: '#111726',
             border: `1px solid ${isPositiveDelta ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
-            borderRadius: 12,
-            padding: '18px 20px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+            borderRadius: 10,
+            padding: '16px 20px',
           }}>
             <div style={{
               color: isPositiveDelta ? '#34d399' : '#f87171',
@@ -310,14 +372,14 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}>
-              Net Impact (Delta)
+              Expected Difference (Net Impact)
             </div>
             <div style={{
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: 800,
               color: isPositiveDelta ? '#10b981' : '#ef4444',
               fontFamily: 'monospace',
-              marginTop: 6,
+              marginTop: 4,
             }}>
               {isPositiveDelta ? '+' : ''}{Number(simResult.deltaTotal).toLocaleString()}
             </div>
@@ -326,8 +388,8 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               marginTop: 4,
               fontSize: 12,
               fontWeight: 800,
-              color: isPositiveDelta ? '#10b981' : '#ef4444',
-              background: isPositiveDelta ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)',
+              color: isPositiveDelta ? '#34d399' : '#f87171',
+              background: isPositiveDelta ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
               padding: '2px 8px',
               borderRadius: 4,
             }}>
@@ -337,54 +399,77 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         </div>
       )}
 
-      {/* Main Simulation Area: Sliders on Left, Tornado on Right */}
+      {/* ─── Main 2-Column Split: Sliders on Left, Analysis on Right ─── */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))',
         gap: 16,
       }}>
-        {/* Sliders Panel */}
+        {/* ── Left Column: Operational Sliders ── */}
         <div style={{
-          background: '#ffffff',
-          borderRadius: 12,
-          padding: '20px',
-          border: '1px solid #e2e8f0',
+          background: '#111726',
+          borderRadius: 10,
+          padding: '18px',
+          border: '1px solid #1e293b',
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
+          gap: 14,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-              Operational Driver Levers
-            </span>
-            <span style={{ fontSize: 11, color: '#64748b' }}>
-              Range: -50% to +100%
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', paddingBottom: 10 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+                Operational Control Levers
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                Drag sliders to simulate business decisions (-50% to +100%)
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {config.drivers.map((driver) => {
               const val = adjustments[driver.name] ?? 0;
               const isPositive = val > 0;
               const isNegative = val < 0;
 
+              // Find contribution
+              const contribution = simResult?.driverContributions?.find(c => c.driverName === driver.name);
+              const indDelta = contribution?.individualDelta ?? 0;
+
+              // Relationship pill
+              const corr = driver.correlation;
+              const isPositiveCorr = corr > 0.08;
+              const isNegativeCorr = corr < -0.08;
+
               return (
                 <div
                   key={driver.name}
                   style={{
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    background: '#141c2e',
+                    border: '1px solid #1e293b',
                     borderRadius: 8,
                     padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
                         {driver.label}
                       </span>
-                      <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>
-                        (Avg: {Number(driver.currentAvg).toLocaleString()})
+
+                      {/* Relationship Pill */}
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '1px 7px',
+                        borderRadius: 99,
+                        background: isPositiveCorr ? 'rgba(16, 185, 129, 0.15)' : isNegativeCorr ? 'rgba(239, 68, 68, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                        color: isPositiveCorr ? '#34d399' : isNegativeCorr ? '#f87171' : '#94a3b8',
+                      }}>
+                        {isPositiveCorr ? `🟢 Drives Growth (+${corr})` : isNegativeCorr ? `🔴 Negative Drag (${corr})` : `⚪ Neutral (${corr})`}
                       </span>
                     </div>
 
@@ -392,7 +477,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                       fontSize: 13,
                       fontWeight: 800,
                       fontFamily: 'monospace',
-                      color: isPositive ? '#2563eb' : isNegative ? '#dc2626' : '#64748b',
+                      color: isPositive ? '#60a5fa' : isNegative ? '#f87171' : '#94a3b8',
                     }}>
                       {val > 0 ? `+${val}%` : `${val}%`}
                     </span>
@@ -413,26 +498,37 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                     }}
                   />
 
-                  {/* Quick Preset Buttons */}
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    {[-25, -10, 0, 10, 25, 50].map(preset => (
-                      <button
-                        key={preset}
-                        onClick={() => handleSliderChange(driver.name, preset)}
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          border: '1px solid #cbd5e1',
-                          background: val === preset ? '#eff6ff' : '#ffffff',
-                          color: val === preset ? '#2563eb' : '#475569',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {preset > 0 ? `+${preset}%` : preset === 0 ? '0%' : `${preset}%`}
-                      </button>
-                    ))}
+                  {/* Quick Preset Buttons & Individual Delta */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[-25, -10, 0, 10, 25, 50].map(preset => (
+                        <button
+                          key={preset}
+                          onClick={() => handleSliderChange(driver.name, preset)}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            border: '1px solid #1e293b',
+                            background: val === preset ? '#3b82f6' : '#0e1422',
+                            color: val === preset ? '#ffffff' : '#94a3b8',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {preset > 0 ? `+${preset}%` : preset === 0 ? '0%' : `${preset}%`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Instant Impact Line */}
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: indDelta > 0 ? '#34d399' : indDelta < 0 ? '#f87171' : '#64748b',
+                    }}>
+                      {val === 0 ? 'Baseline (No shift)' : `${indDelta >= 0 ? '+' : ''}${indDelta.toLocaleString()} on ${targetCol}`}
+                    </span>
                   </div>
                 </div>
               );
@@ -440,32 +536,103 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
           </div>
         </div>
 
-        {/* Tornado Sensitivity Chart */}
+        {/* ── Right Column: The Analysis Card (What Is Actually Happening?) ── */}
         <div style={{
-          background: '#0f1117',
-          borderRadius: 12,
-          padding: '16px',
-          border: '1px solid #1e2337',
+          background: '#111726',
+          borderRadius: 10,
+          padding: '18px',
+          border: '1px solid #1e293b',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
+          gap: 14,
         }}>
-          <div ref={tornadoChartRef} style={{ width: '100%', height: 260 }} />
+          <div style={{ borderBottom: '1px solid #1e293b', paddingBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+              Live Impact &amp; Intelligence Analysis
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+              Visual breakdown and plain-English explanation of your simulation
+            </div>
+          </div>
 
-          {/* Strategic Narrative Recommendation */}
-          {topDriver && (
+          {/* Visual Chart */}
+          <div ref={chartRef} style={{ width: '100%', height: 210, borderRadius: 8, overflow: 'hidden' }} />
+
+          {/* Plain English Explanation Box */}
+          <div style={{
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: 8,
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>💡 What This Means in Plain English:</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#e2e8f0', lineHeight: 1.5 }}>
+              {simResult?.summaryText}
+            </div>
+          </div>
+
+          {/* Active Drivers Breakdown */}
+          {simResult && simResult.driverContributions && simResult.driverContributions.some(c => c.adjustmentPercent !== 0) && (
             <div style={{
-              background: 'rgba(59,130,246,0.1)',
-              border: '1px solid rgba(59,130,246,0.25)',
+              background: '#141c2e',
+              border: '1px solid #1e293b',
               borderRadius: 8,
-              padding: '10px 14px',
-              marginTop: 12,
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>💡 Strategic Driver Recommendation:</span>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Driver Impact Contribution
               </div>
-              <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4, lineHeight: 1.5 }}>
-                <b>{topDriver.driverName.replace(/_/g, ' ')}</b> is your primary operational growth lever. A standard <b>+10% shift</b> in this driver generates an estimated <b>+{Number(topDriver.impactPerTenPercent).toLocaleString()}</b> in {targetCol}.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {simResult.driverContributions
+                  .filter(c => c.adjustmentPercent !== 0)
+                  .map(c => (
+                    <div key={c.driverName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: '#f8fafc', fontWeight: 600 }}>{c.label}</span>
+                        <span style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: 11 }}>
+                          ({c.adjustmentPercent > 0 ? `+${c.adjustmentPercent}%` : `${c.adjustmentPercent}%`})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          color: c.individualDelta >= 0 ? '#10b981' : '#ef4444',
+                        }}>
+                          {c.individualDelta >= 0 ? '+' : ''}{c.individualDelta.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                          ({c.shareOfChangePercent}% share)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Strategic Recommendation */}
+          {simResult?.recommendationText && (
+            <div style={{
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
+              borderRadius: 8,
+              padding: '11px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <span style={{ fontSize: 16 }}>🎯</span>
+              <div style={{ fontSize: 11, color: '#a7f3d0', fontWeight: 600, lineHeight: 1.4 }}>
+                {simResult.recommendationText}
               </div>
             </div>
           )}
