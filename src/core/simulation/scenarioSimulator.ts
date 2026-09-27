@@ -42,14 +42,15 @@ export async function detectSimulationConfig(
     }
 
     if (col.detectedType === ColumnType.NUMERIC || col.detectedType === ColumnType.BOOLEAN) {
+      const colEsc = `TRY_CAST("${col.name.replace(/"/g, '""')}" AS DOUBLE)`;
       // Check if values are strictly 4-digit years (e.g. min 1900, max 2100)
       const yrCheck = await queryFn(`
         SELECT
-          MIN("${col.name}") as min_v,
-          MAX("${col.name}") as max_v,
-          AVG("${col.name}") as avg_v
+          MIN(${colEsc}) as min_v,
+          MAX(${colEsc}) as max_v,
+          AVG(${colEsc}) as avg_v
         FROM ${tableName}
-        WHERE "${col.name}" IS NOT NULL
+        WHERE ${colEsc} IS NOT NULL
       `);
       const minV = Number(yrCheck[0]?.min_v || 0);
       const maxV = Number(yrCheck[0]?.max_v || 0);
@@ -99,7 +100,7 @@ export async function detectSimulationConfig(
           priority: 80,
           distinctCount: col.distinctCount,
         });
-      } else if (col.distinctCount > 5) {
+      } else if (col.distinctCount > 2) {
         // Generic numeric metric
         candidateCols.push({
           name: col.name,
@@ -107,6 +108,26 @@ export async function detectSimulationConfig(
           kind: 'total',
           unit: '',
           priority: 50,
+          distinctCount: col.distinctCount,
+        });
+      }
+    }
+  }
+
+  // Fallback: If no priority pattern matched, include any non-year, non-ID numeric column
+  if (candidateCols.length === 0) {
+    for (const col of schema.columns) {
+      const lower = col.name.toLowerCase().trim();
+      if (
+        (col.detectedType === ColumnType.NUMERIC || col.detectedType === ColumnType.BOOLEAN) &&
+        !EXCLUDE_PATTERN.test(lower)
+      ) {
+        candidateCols.push({
+          name: col.name,
+          label: col.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          kind: 'total',
+          unit: '',
+          priority: 10,
           distinctCount: col.distinctCount,
         });
       }
@@ -135,21 +156,26 @@ export async function detectSimulationConfig(
       : 'Calculates projected total volume and average',
   }));
 
-  // Pick up to 5 drivers (numeric columns other than the target, excluding IDs and Years)
-  const driverCandidates = schema.columns.filter(c => {
+  // Pick up to 5 drivers (strictly numeric columns other than the target, excluding IDs and Years)
+  let driverCandidates = schema.columns.filter(c => {
     const l = c.name.toLowerCase().trim();
     return c.name !== targetColumn &&
            !EXCLUDE_PATTERN.test(l) &&
            c.detectedType !== ColumnType.IDENTIFIER &&
            c.detectedType !== ColumnType.DATE &&
-           (c.detectedType === ColumnType.NUMERIC || c.distinctCount >= 2);
+           c.detectedType === ColumnType.NUMERIC;
   }).slice(0, 5);
 
-  const targetEsc = `"${targetColumn.replace(/"/g, '""')}"`;
+  if (driverCandidates.length === 0) {
+    const fallbackTarget = schema.columns.find(c => c.name === targetColumn);
+    if (fallbackTarget) driverCandidates = [fallbackTarget];
+  }
+
+  const targetEsc = `TRY_CAST("${targetColumn.replace(/"/g, '""')}" AS DOUBLE)`;
   const drivers: SimulationDriver[] = [];
 
   for (const col of driverCandidates) {
-    const esc = `"${col.name.replace(/"/g, '""')}"`;
+    const esc = `TRY_CAST("${col.name.replace(/"/g, '""')}" AS DOUBLE)`;
     try {
       const stats = await queryFn(`
         SELECT
@@ -244,7 +270,7 @@ export async function runSimulation(
   adjustments: Record<string, number>,
   filter?: ActiveFilter
 ): Promise<SimulationResult> {
-  const targetEsc = `"${targetCol.replace(/"/g, '""')}"`;
+  const targetEsc = `TRY_CAST("${targetCol.replace(/"/g, '""')}" AS DOUBLE)`;
   const filterWhere = filter
     ? `WHERE "${filter.column.replace(/"/g, '""')}" = '${String(filter.value).replace(/'/g, "''")}'`
     : '';
@@ -318,7 +344,7 @@ export async function runSimulation(
 
   for (const driverName of driverKeys) {
     const percentAdj = adjustments[driverName] || 0;
-    const driverEsc = `"${driverName.replace(/"/g, '""')}"`;
+    const driverEsc = `TRY_CAST("${driverName.replace(/"/g, '""')}" AS DOUBLE)`;
 
     let slope = 0;
     let corr = 0;

@@ -37,8 +37,9 @@ export async function detectSchema(
     `);
     const sampleValues = samples.map(s => s[columnName]);
 
-    // Classify column type (with sample checking for date strings)
+    // Classify column type (with sample checking for date and numeric strings)
     let isDateString = false;
+    let isNumericString = false;
     if (duckdbType.includes('VARCHAR') || duckdbType.includes('TEXT')) {
       try {
         const dateCheck = await queryFn(`
@@ -54,6 +55,24 @@ export async function detectSchema(
           isDateString = true;
         }
       } catch {}
+
+      if (!isDateString) {
+        try {
+          const numCheck = await queryFn(`
+            SELECT count(*) as cnt FROM (
+              SELECT TRY_CAST("${columnName}" AS DOUBLE) as n
+              FROM ${tableName}
+              WHERE "${columnName}" IS NOT NULL AND trim(CAST("${columnName}" AS VARCHAR)) != ''
+              LIMIT 20
+            ) WHERE n IS NOT NULL
+          `);
+          const validNums = Number(numCheck[0]?.cnt || 0);
+          const nonBlank = samples.filter(s => s !== null && s !== undefined && String(s).trim() !== '').length;
+          if (validNums >= 2 && validNums >= Math.min(nonBlank, 5) * 0.7) {
+            isNumericString = true;
+          }
+        } catch {}
+      }
     }
 
     const detectedType = classifyColumn(
@@ -62,7 +81,8 @@ export async function detectSchema(
       distinctCount,
       totalRows,
       sampleValues,
-      isDateString
+      isDateString,
+      isNumericString
     );
 
     columns.push({
@@ -95,7 +115,8 @@ function classifyColumn(
   distinctCount: number,
   totalRows: number,
   _sampleValues: any[],
-  isDateString: boolean = false
+  isDateString: boolean = false,
+  isNumericString: boolean = false
 ): ColumnType {
   const lower = columnName.toLowerCase().trim();
 
@@ -113,8 +134,9 @@ function classifyColumn(
   const isIdPattern = /(_id|^id$|id$|_key$|^key$|_code$|^code$|zip|postal|phone|ssn|account|row_num|record_num|isbn|uuid|guid)/i.test(lower);
   const cardinalityRatio = totalRows > 0 ? distinctCount / totalRows : 0;
 
-  // Numeric detection
+  // Numeric detection (native DuckDB numeric OR parsed numeric string)
   if (
+    isNumericString ||
     duckdbType.includes('INTEGER') ||
     duckdbType.includes('BIGINT') ||
     duckdbType.includes('DOUBLE') ||
