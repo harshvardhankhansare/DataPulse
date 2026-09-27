@@ -113,7 +113,7 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
   };
 
   // 1-Click Data Cleaning Actions
-  const handleCleanAction = async (action: 'remove_duplicates' | 'fill_nulls_zero' | 'trim_spaces') => {
+  const handleCleanAction = async (action: 'remove_duplicates' | 'fill_nulls_zero' | 'fill_nulls_mean' | 'fill_nulls_median' | 'fill_nulls_mode' | 'drop_null_rows' | 'standardize_dates' | 'trim_spaces') => {
     try {
       setLoading(true);
       const res = await window.electron.cleanData(schema.tableName, action);
@@ -187,13 +187,43 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
             🧹 Remove Duplicates
           </button>
 
+          {/* Smart Null Fixer Dropdown */}
+          <select
+            defaultValue=""
+            onChange={e => {
+              if (e.target.value) {
+                handleCleanAction(e.target.value as any);
+                e.target.value = '';
+              }
+            }}
+            style={{
+              padding: '6px 10px',
+              fontSize: 11,
+              border: '1px solid #1e293b',
+              background: '#141c2e',
+              color: '#f8fafc',
+              borderRadius: 6,
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+            title="Choose how to fix blank or missing values"
+          >
+            <option value="" disabled>🩹 Fix Missing / Nulls ▾</option>
+            <option value="fill_nulls_mean">Fill Numbers with Average</option>
+            <option value="fill_nulls_median">Fill Numbers with Median (Outlier Safe)</option>
+            <option value="fill_nulls_mode">Fill Text with Most Common</option>
+            <option value="fill_nulls_zero">Fill Numbers with 0</option>
+            <option value="drop_null_rows">🗑️ Delete Incomplete Rows</option>
+          </select>
+
+          {/* Date Standardizer */}
           <button
             className="dp-btn dp-btn-ghost"
             style={{ padding: '6px 11px', fontSize: 11, border: '1px solid #1e293b' }}
-            onClick={() => handleCleanAction('fill_nulls_zero')}
-            title="Replace blank / null numeric cells with 0"
+            onClick={() => handleCleanAction('standardize_dates')}
+            title="Convert all mixed date formats (e.g. 15-Jan-2024, 01/15/2024) into standard YYYY-MM-DD"
           >
-            🩹 Fill Missing (0)
+            📅 Fix Date Formats
           </button>
 
           <button

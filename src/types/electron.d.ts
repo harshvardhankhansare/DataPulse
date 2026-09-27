@@ -158,7 +158,7 @@ export interface ElectronAPI {
     success: boolean;
     error?: string;
   }>;
-  cleanData: (tableName: string, action: 'remove_duplicates' | 'fill_nulls_zero' | 'trim_spaces') => Promise<{
+  cleanData: (tableName: string, action: 'remove_duplicates' | 'fill_nulls_zero' | 'fill_nulls_mean' | 'fill_nulls_median' | 'fill_nulls_mode' | 'drop_null_rows' | 'standardize_dates' | 'trim_spaces' | string) => Promise<{
     success: boolean;
     message?: string;
     error?: string;
