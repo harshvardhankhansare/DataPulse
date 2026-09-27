@@ -132,9 +132,10 @@ function classifyColumn(
       return ColumnType.IDENTIFIER;
     }
 
-    // Year column (e.g. 2020, 2021, 2022) is better treated as categorical/dimension
-    if ((lower === 'year' || lower === 'yr') && distinctCount < 50) {
-      return ColumnType.CATEGORICAL;
+    // Year column (e.g. JoiningYear, BirthYear, Year, 2015, 2020) is a date/temporal dimension, NEVER a numeric measure to sum!
+    const isYearCol = /(_year|^year$|year$|_yr$|^yr$|joiningyear|birthyear|orderyear|modelyear|hireyear|gradyear)/i.test(lower);
+    if (isYearCol && distinctCount < 200) {
+      return ColumnType.DATE;
     }
 
     return ColumnType.NUMERIC;

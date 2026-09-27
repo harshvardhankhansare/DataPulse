@@ -19,7 +19,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   const chartRef = useRef<HTMLDivElement>(null);
   const echartsInstanceRef = useRef<echarts.ECharts | null>(null);
 
-  // 1. Fetch simulation configuration (drivers & candidate targets)
+  // 1. Fetch simulation configuration
   useEffect(() => {
     async function loadConfig() {
       if (!window.electron?.getSimulationConfig) return;
@@ -65,7 +65,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
     executeSimulation();
   }, [schema.tableName, targetCol, adjustments, activeFilter]);
 
-  // 3. Render Comparison & Contribution Chart
+  // 3. Render Comparison Chart
   useEffect(() => {
     if (!chartRef.current || !simResult) return;
 
@@ -74,12 +74,14 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
     }
     const chart = echartsInstanceRef.current;
 
-    const isGain = simResult.deltaTotal >= 0;
+    const isRate = simResult.targetKind === 'rate';
+    // For rate (like attrition/churn), a decrease in rate is positive/good!
+    const isGoodOutcome = isRate ? simResult.deltaValue <= 0 : simResult.deltaValue >= 0;
 
     const option: echarts.EChartsOption = {
       backgroundColor: '#111726',
       title: {
-        text: 'Baseline vs. Projected Outcome',
+        text: `${simResult.targetLabel}: Baseline vs. Simulated`,
         left: 16,
         top: 14,
         textStyle: { color: '#f8fafc', fontSize: 13, fontWeight: 700 },
@@ -92,7 +94,8 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         textStyle: { color: '#f8fafc', fontSize: 12 },
         formatter: (params: any) => {
           const p = Array.isArray(params) ? params[0] : params;
-          return `<b>${p.name}</b><br/>Value: <b style="color:#60a5fa">${Number(p.value).toLocaleString()}</b>`;
+          const valStr = isRate ? `${p.value}%` : Number(p.value).toLocaleString();
+          return `<b>${p.name}</b><br/>${simResult.targetLabel}: <b style="color:#60a5fa">${valStr}</b>`;
         },
       },
       grid: { left: '16%', right: '10%', top: 55, bottom: 30 },
@@ -107,7 +110,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         axisLabel: {
           color: '#94a3b8',
           fontSize: 11,
-          formatter: (v: number) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)),
+          formatter: (v: number) => isRate ? `${v}%` : v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v),
         },
         splitLine: { lineStyle: { color: '#1a2234' } },
       },
@@ -116,13 +119,13 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
           type: 'bar',
           data: [
             {
-              value: simResult.baselineTotal,
+              value: simResult.baselineValue,
               itemStyle: { color: '#475569', borderRadius: [6, 6, 0, 0] },
             },
             {
-              value: simResult.projectedTotal,
+              value: simResult.projectedValue,
               itemStyle: {
-                color: isGain ? '#10b981' : '#ef4444',
+                color: isGoodOutcome ? '#10b981' : '#ef4444',
                 borderRadius: [6, 6, 0, 0],
               },
             },
@@ -134,7 +137,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
             color: '#f8fafc',
             fontSize: 12,
             fontWeight: 700,
-            formatter: (p: any) => Number(p.value).toLocaleString(),
+            formatter: (p: any) => isRate ? `${p.value}%` : Number(p.value).toLocaleString(),
           },
         },
       ],
@@ -179,7 +182,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '40px 0', color: '#64748b', fontSize: 13 }}>
         <span className="dp-spinner" />
-        Configuring statistical simulation model...
+        Analyzing dataset metrics and regression levers...
       </div>
     );
   }
@@ -187,12 +190,13 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   if (!config || config.drivers.length === 0) {
     return (
       <div style={{ padding: '40px 0', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-        No numeric metrics available for simulation in this dataset.
+        No operational metrics available for simulation in this dataset.
       </div>
     );
   }
 
-  const isPositiveDelta = (simResult?.deltaTotal ?? 0) >= 0;
+  const isRate = simResult?.targetKind === 'rate';
+  const isGoodOutcome = isRate ? (simResult?.deltaValue ?? 0) <= 0 : (simResult?.deltaValue ?? 0) >= 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -209,13 +213,15 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
         border: '1px solid #1e293b',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }}>🎯</span>
+          <span style={{ fontSize: 22 }}>🎯</span>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
-              Metric to Predict:
+              Business Metric to Predict:
             </div>
             <div style={{ fontSize: 11, color: '#94a3b8' }}>
-              Select which business metric changes as you move the sliders
+              {isRate
+                ? 'Binary Outcome / Probability Mode (e.g. Employee Turnover %)'
+                : 'Continuous Metric Mode (e.g. Total Revenue or Average Score)'}
             </div>
           </div>
         </div>
@@ -234,12 +240,11 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               background: '#141c2e',
               cursor: 'pointer',
               outline: 'none',
-              fontFamily: 'monospace',
             }}
           >
-            {config.availableTargets.map(col => (
-              <option key={col} value={col}>
-                {col}
+            {config.availableTargets.map(t => (
+              <option key={t.name} value={t.name}>
+                {t.label} ({t.name})
               </option>
             ))}
           </select>
@@ -274,9 +279,9 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
-              title="Boost positive drivers by +20% and reduce drag"
+              title="Improve compensation / growth levers by +20%"
             >
-              🚀 Growth (+20%)
+              🚀 Optimize (+20%)
             </button>
             <button
               onClick={() => applyPreset('conservative')}
@@ -292,7 +297,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               }}
               title="Modest +5% shift"
             >
-              🛡️ Conservative (+5%)
+              🛡️ Modest (+5%)
             </button>
             <button
               onClick={() => applyPreset('stress')}
@@ -306,7 +311,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                 fontWeight: 700,
                 cursor: 'pointer',
               }}
-              title="Simulate a market downturn (-15%)"
+              title="Stress test (-15% change)"
             >
               📉 Stress Test (-15%)
             </button>
@@ -329,13 +334,13 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
             padding: '16px 20px',
           }}>
             <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Current Historical Total
+              Current Historical {isRate ? 'Rate' : 'Total'}
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#f8fafc', fontFamily: 'monospace', marginTop: 4 }}>
-              {Number(simResult.baselineTotal).toLocaleString()}
+              {isRate ? `${simResult.baselineValue}%` : Number(simResult.baselineValue).toLocaleString()}
             </div>
             <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
-              Historical average per row: <b>{Number(simResult.baselineAvg).toLocaleString()}</b>
+              {simResult.baselineSecondaryText}
             </div>
           </div>
 
@@ -348,52 +353,52 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
             boxShadow: '0 4px 18px rgba(59,130,246,0.18)',
           }}>
             <div style={{ color: '#60a5fa', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Simulated Future Total
+              Simulated Future Outcome
             </div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#38bdf8', fontFamily: 'monospace', marginTop: 4 }}>
-              {Number(simResult.projectedTotal).toLocaleString()}
+              {isRate ? `${simResult.projectedValue}%` : Number(simResult.projectedValue).toLocaleString()}
             </div>
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>
-              Projected average per row: <b>{Number(simResult.projectedAvg).toLocaleString()}</b>
+              {simResult.projectedSecondaryText}
             </div>
           </div>
 
           {/* Simulated Delta Card */}
           <div style={{
             background: '#111726',
-            border: `1px solid ${isPositiveDelta ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
+            border: `1px solid ${isGoodOutcome ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
             borderRadius: 10,
             padding: '16px 20px',
           }}>
             <div style={{
-              color: isPositiveDelta ? '#34d399' : '#f87171',
+              color: isGoodOutcome ? '#34d399' : '#f87171',
               fontSize: 11,
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
             }}>
-              Expected Difference (Net Impact)
+              Net Impact (Difference)
             </div>
             <div style={{
               fontSize: 28,
               fontWeight: 800,
-              color: isPositiveDelta ? '#10b981' : '#ef4444',
+              color: isGoodOutcome ? '#10b981' : '#ef4444',
               fontFamily: 'monospace',
               marginTop: 4,
             }}>
-              {isPositiveDelta ? '+' : ''}{Number(simResult.deltaTotal).toLocaleString()}
+              {simResult.deltaValue > 0 ? '+' : ''}{isRate ? `${simResult.deltaValue}%-pts` : Number(simResult.deltaValue).toLocaleString()}
             </div>
             <div style={{
               display: 'inline-block',
               marginTop: 4,
-              fontSize: 12,
-              fontWeight: 800,
-              color: isPositiveDelta ? '#34d399' : '#f87171',
-              background: isPositiveDelta ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+              fontSize: 11,
+              fontWeight: 700,
+              color: isGoodOutcome ? '#34d399' : '#f87171',
+              background: isGoodOutcome ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
               padding: '2px 8px',
               borderRadius: 4,
             }}>
-              {isPositiveDelta ? '▲ +' : '▼ '}{simResult.percentChange}%
+              {simResult.deltaSecondaryText}
             </div>
           </div>
         </div>
@@ -421,7 +426,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                 Operational Control Levers
               </div>
               <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                Drag sliders to simulate business decisions (-50% to +100%)
+                Drag sliders to simulate decisions (-50% to +100%)
               </div>
             </div>
           </div>
@@ -429,8 +434,8 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {config.drivers.map((driver) => {
               const val = adjustments[driver.name] ?? 0;
-              const isPositive = val > 0;
-              const isNegative = val < 0;
+              const isPositiveVal = val > 0;
+              const isNegativeVal = val < 0;
 
               // Find contribution
               const contribution = simResult?.driverContributions?.find(c => c.driverName === driver.name);
@@ -438,8 +443,50 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
 
               // Relationship pill
               const corr = driver.correlation;
-              const isPositiveCorr = corr > 0.08;
-              const isNegativeCorr = corr < -0.08;
+              let badgeText = '';
+              let badgeColor = '#94a3b8';
+              let badgeBg = 'rgba(148, 163, 184, 0.15)';
+
+              if (isRate) {
+                // In attrition/churn, negative correlation means higher driver = fewer leave (Retains staff!)
+                if (corr < -0.05) {
+                  badgeText = `🟢 Retains Staff / Lowers Turnover (corr: ${corr})`;
+                  badgeColor = '#34d399';
+                  badgeBg = 'rgba(16, 185, 129, 0.15)';
+                } else if (corr > 0.05) {
+                  badgeText = `🔴 Risk / Increases Turnover (corr: +${corr})`;
+                  badgeColor = '#f87171';
+                  badgeBg = 'rgba(239, 68, 68, 0.15)';
+                } else {
+                  badgeText = `⚪ Neutral (corr: ${corr})`;
+                }
+              } else {
+                if (corr > 0.05) {
+                  badgeText = `🟢 Drives Growth (+${corr})`;
+                  badgeColor = '#34d399';
+                  badgeBg = 'rgba(16, 185, 129, 0.15)';
+                } else if (corr < -0.05) {
+                  badgeText = `🔴 Negative Drag (${corr})`;
+                  badgeColor = '#f87171';
+                  badgeBg = 'rgba(239, 68, 68, 0.15)';
+                } else {
+                  badgeText = `⚪ Neutral (${corr})`;
+                }
+              }
+
+              // Dynamic impact explanation string
+              let impactDisplay = '';
+              if (val === 0) {
+                impactDisplay = 'Baseline (0% shift)';
+              } else if (isRate) {
+                impactDisplay = indDelta < 0
+                  ? `Reduces turnover by ${Math.abs(indDelta)}%-pts`
+                  : indDelta > 0
+                  ? `Increases turnover by +${indDelta}%-pts`
+                  : 'Minimal effect';
+              } else {
+                impactDisplay = `${indDelta >= 0 ? '+' : ''}${indDelta.toLocaleString()} on ${simResult?.targetLabel || 'target'}`;
+              }
 
               return (
                 <div
@@ -466,10 +513,10 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                         fontWeight: 700,
                         padding: '1px 7px',
                         borderRadius: 99,
-                        background: isPositiveCorr ? 'rgba(16, 185, 129, 0.15)' : isNegativeCorr ? 'rgba(239, 68, 68, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                        color: isPositiveCorr ? '#34d399' : isNegativeCorr ? '#f87171' : '#94a3b8',
+                        background: badgeBg,
+                        color: badgeColor,
                       }}>
-                        {isPositiveCorr ? `🟢 Drives Growth (+${corr})` : isNegativeCorr ? `🔴 Negative Drag (${corr})` : `⚪ Neutral (${corr})`}
+                        {badgeText}
                       </span>
                     </div>
 
@@ -477,7 +524,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                       fontSize: 13,
                       fontWeight: 800,
                       fontFamily: 'monospace',
-                      color: isPositive ? '#60a5fa' : isNegative ? '#f87171' : '#94a3b8',
+                      color: isPositiveVal ? '#60a5fa' : isNegativeVal ? '#f87171' : '#94a3b8',
                     }}>
                       {val > 0 ? `+${val}%` : `${val}%`}
                     </span>
@@ -498,7 +545,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                     }}
                   />
 
-                  {/* Quick Preset Buttons & Individual Delta */}
+                  {/* Quick Preset Buttons & Instant Delta */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                     <div style={{ display: 'flex', gap: 4 }}>
                       {[-25, -10, 0, 10, 25, 50].map(preset => (
@@ -525,9 +572,9 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
                     <span style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      color: indDelta > 0 ? '#34d399' : indDelta < 0 ? '#f87171' : '#64748b',
+                      color: (isRate ? indDelta <= 0 : indDelta >= 0) ? '#34d399' : '#f87171',
                     }}>
-                      {val === 0 ? 'Baseline (No shift)' : `${indDelta >= 0 ? '+' : ''}${indDelta.toLocaleString()} on ${targetCol}`}
+                      {impactDisplay}
                     </span>
                   </div>
                 </div>
@@ -593,28 +640,31 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {simResult.driverContributions
                   .filter(c => c.adjustmentPercent !== 0)
-                  .map(c => (
-                    <div key={c.driverName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: '#f8fafc', fontWeight: 600 }}>{c.label}</span>
-                        <span style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: 11 }}>
-                          ({c.adjustmentPercent > 0 ? `+${c.adjustmentPercent}%` : `${c.adjustmentPercent}%`})
-                        </span>
+                  .map(c => {
+                    const isGoodInd = isRate ? c.individualDelta <= 0 : c.individualDelta >= 0;
+                    return (
+                      <div key={c.driverName} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: '#f8fafc', fontWeight: 600 }}>{c.label}</span>
+                          <span style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: 11 }}>
+                            ({c.adjustmentPercent > 0 ? `+${c.adjustmentPercent}%` : `${c.adjustmentPercent}%`})
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{
+                            fontWeight: 700,
+                            fontFamily: 'monospace',
+                            color: isGoodInd ? '#10b981' : '#ef4444',
+                          }}>
+                            {c.individualDelta > 0 ? '+' : ''}{isRate ? `${c.individualDelta}%-pts` : c.individualDelta.toLocaleString()}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#64748b' }}>
+                            ({c.shareOfChangePercent}% share)
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{
-                          fontWeight: 700,
-                          fontFamily: 'monospace',
-                          color: c.individualDelta >= 0 ? '#10b981' : '#ef4444',
-                        }}>
-                          {c.individualDelta >= 0 ? '+' : ''}{c.individualDelta.toLocaleString()}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#64748b' }}>
-                          ({c.shareOfChangePercent}% share)
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}
