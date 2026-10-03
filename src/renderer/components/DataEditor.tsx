@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
+import { useAppStore } from '../store/useAppStore';
 
-interface DataEditorProps {
-  schema: TableSchema;
-  fileName?: string | null;
-  onDataChanged?: () => void;
-}
-
-export default function DataEditor({ schema, fileName, onDataChanged }: DataEditorProps) {
+export default function DataEditor() {
+  const schema = useAppStore(s => s.schema);
+  const fileName = useAppStore(s => s.fileName);
+  const bumpDataVersion = useAppStore(s => s.bumpDataVersion);
   const [rows, setRows] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -61,7 +58,7 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
 
   // Save edited cell
   const handleSaveEdit = async () => {
-    if (!editingCell) return;
+    if (!editingCell || !schema) return;
     const { rowid, column } = editingCell;
     setEditingCell(null);
 
@@ -85,7 +82,7 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
         setStatusMessage({ text: `✓ Updated [${column}] successfully`, type: 'success' });
         // Optimistically update local row
         setRows(prev => prev.map(r => r.rowid === rowid ? { ...r, [column]: parsedVal } : r));
-        if (onDataChanged) onDataChanged();
+        bumpDataVersion();
       } else {
         setStatusMessage({ text: `Update error: ${res.error}`, type: 'error' });
       }
@@ -98,12 +95,13 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
   // Delete single row
   const handleDeleteRow = async (rowid: number) => {
     if (!window.confirm('Are you sure you want to delete this row?')) return;
+    if (!schema) return;
     try {
       const res = await window.electron.deleteRow(schema.tableName, rowid);
       if (res.success) {
         setStatusMessage({ text: '✓ Row deleted', type: 'info' });
         loadData();
-        if (onDataChanged) onDataChanged();
+        bumpDataVersion();
       } else {
         setStatusMessage({ text: `Delete error: ${res.error}`, type: 'error' });
       }
@@ -114,13 +112,14 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
 
   // 1-Click Data Cleaning Actions
   const handleCleanAction = async (action: 'remove_duplicates' | 'fill_nulls_zero' | 'fill_nulls_mean' | 'fill_nulls_median' | 'fill_nulls_mode' | 'drop_null_rows' | 'standardize_dates' | 'trim_spaces') => {
+    if (!schema) return;
     try {
       setLoading(true);
       const res = await window.electron.cleanData(schema.tableName, action);
       if (res.success) {
         setStatusMessage({ text: `✓ ${res.message}`, type: 'success' });
         loadData();
-        if (onDataChanged) onDataChanged();
+        bumpDataVersion();
       } else {
         setStatusMessage({ text: `Cleaning error: ${res.error}`, type: 'error' });
       }
@@ -133,6 +132,7 @@ export default function DataEditor({ schema, fileName, onDataChanged }: DataEdit
 
   // Export cleaned CSV
   const handleExportCsv = async () => {
+    if (!schema) return;
     try {
       const res = await window.electron.exportCleanedCsv(schema.tableName, fileName || 'data');
       if (res.success && res.filePath) {

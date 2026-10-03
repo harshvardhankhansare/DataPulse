@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
 import { ChartConfig } from '@core/charts/chartTypes';
 import { ChartCard } from './ChartGrid';
-
-interface AiQueryPanelProps {
-  schema: TableSchema;
-}
+import { useAppStore } from '../store/useAppStore';
 
 interface AiServerState {
   available: boolean;
@@ -15,7 +11,8 @@ interface AiServerState {
   error?: string;
 }
 
-export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
+export default function AiQueryPanel() {
+  const schema = useAppStore(s => s.schema);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState('http://127.0.0.1:1234/v1');
@@ -56,7 +53,7 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
 
   const handleAsk = async (promptText?: string) => {
     const q = promptText || question;
-    if (!q.trim() || loading) return;
+    if (!schema || !q.trim() || loading) return;
 
     setLoading(true);
     setQueryResult(null);
@@ -85,8 +82,8 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
   };
 
   // Generate dynamic suggestion chips based on table columns
-  const numericCols = schema.columns.filter(c => c.detectedType === 'numeric');
-  const catCols = schema.columns.filter(c => c.detectedType === 'categorical');
+  const numericCols = schema?.columns.filter(c => c.detectedType === 'numeric') ?? [];
+  const catCols = schema?.columns.filter(c => c.detectedType === 'categorical') ?? [];
   const suggestions: string[] = [];
 
   if (numericCols.length > 0 && catCols.length > 0) {
@@ -96,7 +93,7 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
   if (numericCols.length >= 2) {
     suggestions.push(`Compare ${numericCols[0].name} vs ${numericCols[1].name}`);
   }
-  if (suggestions.length === 0 && schema.columns.length > 0) {
+  if (suggestions.length === 0 && schema && schema.columns.length > 0) {
     suggestions.push(`Count rows grouped by ${schema.columns[0].name}`);
   }
 

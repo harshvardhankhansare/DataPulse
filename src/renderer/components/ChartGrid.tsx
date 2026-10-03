@@ -2,12 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import * as echarts from 'echarts';
 import { ChartConfig, ChartType, ChartDataPoint } from '../../core/charts/chartTypes';
 import { ActiveFilter } from '../../core/analytics/filterTypes';
-
-interface ChartGridProps {
-  charts: ChartConfig[];
-  onFilterSelect?: (filter: ActiveFilter) => void;
-  activeFilter?: ActiveFilter | null;
-}
+import { useAppStore } from '../store/useAppStore';
 
 const COLOR_PALETTE = [
   '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899',
@@ -580,11 +575,11 @@ export function ChartCard({
             },
             areaStyle: isArea
               ? {
-                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(59, 130, 246, 0.45)' },
-                    { offset: 1, color: 'rgba(59, 130, 246, 0.02)' },
-                  ]),
-                }
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(59, 130, 246, 0.45)' },
+                  { offset: 1, color: 'rgba(59, 130, 246, 0.02)' },
+                ]),
+              }
               : undefined,
           },
         ],
@@ -1067,7 +1062,11 @@ function ChartThumbnail({ config, onClick, isSelected }: { config: ChartConfig; 
 }
 
 /** Full Chart Grid view with Master-Detail split layout */
-export default function ChartGrid({ charts, onFilterSelect, activeFilter }: ChartGridProps) {
+export default function ChartGrid() {
+  const charts = useAppStore(s => s.charts);
+  const toggleFilter = useAppStore(s => s.toggleFilter);
+  const activeFilter = useAppStore(s => s.activeFilter);
+
   // ALL hooks must be called before any early return — React rules of hooks
   const [filterType, setFilterType] = useState<string>('all');
   const [selectedChart, setSelectedChart] = useState<ChartConfig | null>(null);
@@ -1205,7 +1204,7 @@ export default function ChartGrid({ charts, onFilterSelect, activeFilter }: Char
           <ChartCard
             key={`${activeChart.analysisType}-${activeChart.title}`}
             config={activeChart}
-            onFilterSelect={onFilterSelect}
+            onFilterSelect={toggleFilter}
             activeFilter={activeFilter}
           />
         ) : (

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
 import {
   PrivacyAuditReport,
   AirGapStatus,
@@ -8,13 +7,11 @@ import {
   RiskLevel,
 } from '@core/privacy/privacyTypes';
 import { maskValueInJs } from '@core/privacy/piiMasker';
+import { useAppStore } from '../store/useAppStore';
 
-interface PrivacyVaultPanelProps {
-  schema: TableSchema;
-  onPurgeDataset?: () => void;
-}
-
-export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVaultPanelProps) {
+export default function PrivacyVaultPanel() {
+  const schema = useAppStore(s => s.schema);
+  const resetData = useAppStore(s => s.resetData);
   const [report, setReport] = useState<PrivacyAuditReport | null>(null);
   const [airGap, setAirGap] = useState<AirGapStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +23,7 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
 
   // Load audit report and airgap status
   const loadPrivacyData = async () => {
+    if (!schema) return;
     setLoading(true);
     try {
       const [auditRes, airgapRes] = await Promise.all([
@@ -58,7 +56,7 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
 
   useEffect(() => {
     loadPrivacyData();
-  }, [schema.tableName]);
+  }, [schema?.tableName]);
 
   const handleStrategyChange = (column: string, category: PiiCategory, strategy: MaskingStrategy) => {
     setColumnRules(prev => ({
@@ -68,6 +66,7 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
   };
 
   const handleApplyMasking = async () => {
+    if (!schema) return;
     setActionLoading(true);
     try {
       const res = await window.electron.applyMasking(schema.tableName, columnRules);
@@ -82,6 +81,7 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
   };
 
   const handleRevertMasking = async () => {
+    if (!schema) return;
     setActionLoading(true);
     try {
       const res = await window.electron.revertMasking(schema.tableName);
@@ -102,9 +102,9 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
       const res = await window.electron.purgeMemory();
       if (res.success) {
         setPurgeSuccess(`Zeroized all in-memory tables. Volatile RAM reclaimed.`);
-        if (onPurgeDataset) {
+        {
           setTimeout(() => {
-            onPurgeDataset();
+            resetData();
           }, 1200);
         }
       }

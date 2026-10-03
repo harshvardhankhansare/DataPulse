@@ -1,26 +1,14 @@
 import { useState, useRef } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
-import { QualityReport } from '@core/profiler/profilerTypes';
-import { AnalysisTask } from '@core/rules/ruleTypes';
 import {
   LakehouseTable,
   JoinCandidate,
   JoinViewResult,
 } from '@core/lakehouse/lakehouseTypes';
 import SmartJoinModal from './SmartJoinModal';
+import { useAppStore } from '../store/useAppStore';
 
-interface ImportResult {
-  schema: TableSchema;
-  quality: QualityReport;
-  applicableAnalyses: AnalysisTask[];
-  fileName?: string;
-}
-
-interface ImportPanelProps {
-  onImportComplete: (result: ImportResult) => void;
-}
-
-export default function ImportPanel({ onImportComplete }: ImportPanelProps) {
+export default function ImportPanel() {
+  const applyImportResult = useAppStore(s => s.applyImportResult);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lakehouseData, setLakehouseData] = useState<{
@@ -35,7 +23,7 @@ export default function ImportPanel({ onImportComplete }: ImportPanelProps) {
     try {
       const result = await window.electron.importFile(filePath);
       if (result.success && result.schema && result.quality && result.applicableAnalyses) {
-        onImportComplete({
+        applyImportResult({
           schema: result.schema,
           quality: result.quality,
           applicableAnalyses: result.applicableAnalyses,
@@ -195,7 +183,7 @@ export default function ImportPanel({ onImportComplete }: ImportPanelProps) {
           candidates={lakehouseData.candidates}
           onCancel={() => setLakehouseData(null)}
           onJoinComplete={(result: JoinViewResult, blendName: string) => {
-            onImportComplete({
+            applyImportResult({
               schema: result.schema,
               quality: result.quality,
               applicableAnalyses: result.applicableAnalyses,

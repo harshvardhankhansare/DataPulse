@@ -1,22 +1,12 @@
 import { useState, useEffect } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
-import { QualityReport } from '@core/profiler/profilerTypes';
-import { Insight } from '@core/insights/insightTypes';
 import { ExecutiveBriefing } from '@core/reporting/reportingTypes';
+import { useAppStore } from '../store/useAppStore';
 
-interface ExecutiveBriefingPanelProps {
-  schema: TableSchema;
-  quality: QualityReport | null;
-  insights: Insight[];
-  fileName?: string | null;
-}
-
-export default function ExecutiveBriefingPanel({
-  schema,
-  quality,
-  insights,
-  fileName,
-}: ExecutiveBriefingPanelProps) {
+export default function ExecutiveBriefingPanel() {
+  const schema = useAppStore(s => s.schema);
+  const quality = useAppStore(s => s.quality);
+  const insights = useAppStore(s => s.insights);
+  const fileName = useAppStore(s => s.fileName);
   const [briefing, setBriefing] = useState<ExecutiveBriefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportingHtml, setExportingHtml] = useState(false);
@@ -25,7 +15,7 @@ export default function ExecutiveBriefingPanel({
 
   useEffect(() => {
     async function loadBriefing() {
-      if (!window.electron?.generateBriefing) return;
+      if (!schema || !window.electron?.generateBriefing) return;
       setLoading(true);
       try {
         const res = await window.electron.generateBriefing(
@@ -44,7 +34,7 @@ export default function ExecutiveBriefingPanel({
       }
     }
     loadBriefing();
-  }, [schema.tableName, fileName, quality, insights]);
+  }, [schema?.tableName, fileName, quality, insights]);
 
   const handleExportHtml = async () => {
     if (!briefing || !window.electron?.exportBriefingHtml) return;
