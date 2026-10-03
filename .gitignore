@@ -27,9 +27,10 @@ graphify-out/
 test-data/*.csv
 test-phase4-all.mjs
 
-# Markdown docs (keep private)
+# Markdown docs (keep private, except public-facing ones)
 *.md
 !LICENSE
+!README.md
 
 # Internal docs
 docs/phases/
