@@ -1003,137 +1003,217 @@ export function ChartCard({
   );
 }
 
-/** Full Chart Grid view with category filters and layout toggles */
-export default function ChartGrid({ charts, onFilterSelect, activeFilter }: ChartGridProps) {
-  const [filterType, setFilterType] = useState<string>('all');
-  const [columnCount, setColumnCount] = useState<1 | 2>(2);
+function ChartThumbnail({ config, onClick, isSelected }: { config: ChartConfig; onClick: () => void; isSelected?: boolean }) {
+  const iconInfo = TYPE_ICONS[config.chartType] || { icon: '📊', label: 'Chart' };
 
-  if (charts.length === 0) return null;
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: isSelected ? 'rgba(59, 130, 246, 0.12)' : '#0f1117',
+        border: `1px solid ${isSelected ? '#3b82f6' : '#1e2337'}`,
+        borderRadius: 8,
+        padding: '9px 11px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+        transition: 'all 0.15s ease',
+        borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+      }}
+      onMouseEnter={e => {
+        if (!isSelected) {
+          e.currentTarget.style.borderColor = '#3b82f6';
+          e.currentTarget.style.background = 'rgba(59,130,246,0.06)';
+        }
+      }}
+      onMouseLeave={e => {
+        if (!isSelected) {
+          e.currentTarget.style.borderColor = '#1e2337';
+          e.currentTarget.style.background = '#0f1117';
+        }
+      }}
+    >
+      <div style={{
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        background: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.12)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 14,
+        flexShrink: 0,
+        marginTop: 1,
+      }}>
+        {iconInfo.icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: isSelected ? '#60a5fa' : '#e2e8f0',
+          lineHeight: 1.35,
+          wordBreak: 'break-word',
+        }}>
+          {config.title}
+        </div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 3, fontWeight: 600 }}>
+          {iconInfo.label} · {config.analysisType.replace(/_/g, ' ')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Full Chart Grid view with Master-Detail split layout */
+export default function ChartGrid({ charts, onFilterSelect, activeFilter }: ChartGridProps) {
+  // ALL hooks must be called before any early return — React rules of hooks
+  const [filterType, setFilterType] = useState<string>('all');
+  const [selectedChart, setSelectedChart] = useState<ChartConfig | null>(null);
+
+  const rankedCharts = useMemo(() => {
+    if (charts.length === 0) return [];
+    return [...charts].sort((a, b) => {
+      const score = (c: ChartConfig) => {
+        let s = 0;
+        if (c.analysisType === 'correlation') s += 100 + (Math.abs(c.correlation || 0) * 100);
+        if (c.analysisType === 'time_series') s += 80;
+        if (c.analysisType === 'group_aggregation') s += 60;
+        if (c.analysisType === 'descriptive_stats') s += 40;
+        if (c.data) s += Math.min(c.data.length, 20);
+        if (c.scatterData) s += Math.min(c.scatterData.length, 20) * 0.1;
+        return s;
+      };
+      return score(b) - score(a);
+    });
+  }, [charts]);
+
+  const top4 = useMemo(() => rankedCharts.slice(0, 4), [rankedCharts]);
+  const remaining = useMemo(() => rankedCharts.slice(4), [rankedCharts]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    charts.forEach(c => set.add(c.analysisType));
+    remaining.forEach(c => set.add(c.analysisType));
     return Array.from(set);
-  }, [charts]);
+  }, [remaining]);
 
-  const filteredCharts = useMemo(() => {
-    if (filterType === 'all') return charts;
-    return charts.filter(c => c.analysisType === filterType);
-  }, [charts, filterType]);
+  const filteredRemaining = useMemo(() => {
+    if (filterType === 'all') return remaining;
+    return remaining.filter(c => c.analysisType === filterType);
+  }, [remaining, filterType]);
+
+  // Early return AFTER all hooks
+  if (charts.length === 0) return null;
 
   const CATEGORY_NAMES: Record<string, string> = {
-    group_aggregation: 'Group Aggregations',
+    group_aggregation: 'Group Analysis',
     descriptive_stats: 'Distributions',
     time_series: 'Time Series',
     correlation: 'Correlations',
-    ai_query: 'AI Query Charts',
+    ai_query: 'AI Charts',
   };
 
+  const activeChart = selectedChart ?? rankedCharts[0];
+
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Filter and layout controls */}
+    <section style={{ display: 'flex', gap: 0, height: '80vh', minHeight: 580, borderRadius: 14, overflow: 'hidden', border: '1px solid #1a2035' }} className="dp-fadein">
+
+      {/* ── LEFT SIDEBAR (Master list) ─────────────────── */}
       <div style={{
+        width: 300,
+        flexShrink: 0,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 12,
-        background: '#ffffff',
-        padding: '12px 18px',
-        borderRadius: 10,
-        border: '1px solid #e2e8f0',
+        flexDirection: 'column',
+        background: '#090b12',
+        borderRight: '1px solid #1a2035',
+        overflow: 'hidden',
       }}>
-        {/* Category filter pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginRight: 4 }}>
-            Scenario Filter:
-          </span>
-          <button
-            onClick={() => setFilterType('all')}
-            style={{
-              padding: '4px 10px',
-              borderRadius: 99,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: filterType === 'all' ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-              background: filterType === 'all' ? '#eff6ff' : '#f8fafc',
-              color: filterType === 'all' ? '#2563eb' : '#64748b',
-              transition: 'all 0.12s',
-            }}
-          >
-            All ({charts.length})
-          </button>
-          {categories.map(cat => {
-            const isSel = filterType === cat;
-            const count = charts.filter(c => c.analysisType === cat).length;
-            return (
-              <button
-                key={cat}
-                onClick={() => setFilterType(cat)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 99,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: isSel ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                  background: isSel ? '#eff6ff' : '#f8fafc',
-                  color: isSel ? '#2563eb' : '#64748b',
-                  transition: 'all 0.12s',
-                }}
-              >
-                {CATEGORY_NAMES[cat] || cat} ({count})
-              </button>
-            );
-          })}
+        {/* Sidebar header */}
+        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid #141c2e', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+            <span style={{ fontSize: 15 }}>📊</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>Chart Explorer</span>
+            <span style={{ marginLeft: 'auto', background: '#1e2a44', color: '#60a5fa', borderRadius: 99, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+              {charts.length}
+            </span>
+          </div>
+
+          {/* Top Recommended label */}
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>
+            ★ Top Recommended
+          </div>
+
+          {/* Top 4 cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {top4.map((chart, i) => (
+              <ChartThumbnail
+                key={`top-${i}`}
+                config={chart}
+                onClick={() => setSelectedChart(chart)}
+                isSelected={activeChart === chart}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* 1-col vs 2-col layout toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, color: '#94a3b8' }}>Layout:</span>
-          <button
-            onClick={() => setColumnCount(1)}
-            style={{
-              padding: '3px 8px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: columnCount === 1 ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-              background: columnCount === 1 ? '#eff6ff' : '#ffffff',
-              color: columnCount === 1 ? '#2563eb' : '#64748b',
-            }}
-          >
-            Full Width
-          </button>
-          <button
-            onClick={() => setColumnCount(2)}
-            style={{
-              padding: '3px 8px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: columnCount === 2 ? '1px solid #3b82f6' : '1px solid #cbd5e1',
-              background: columnCount === 2 ? '#eff6ff' : '#ffffff',
-              color: columnCount === 2 ? '#2563eb' : '#64748b',
-            }}
-          >
-            2 Columns
-          </button>
+        {/* All charts scrollable area */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px 14px' }}>
+          {remaining.length > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  All Charts
+                </div>
+                {categories.length > 1 && (
+                  <select
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                    style={{ background: '#131722', color: '#94a3b8', border: '1px solid #222d44', borderRadius: 4, padding: '2px 5px', fontSize: 10, outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="all">All ({remaining.length})</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{CATEGORY_NAMES[cat] || cat}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {filteredRemaining.map((chart, i) => (
+                  <ChartThumbnail
+                    key={`rest-${i}`}
+                    config={chart}
+                    onClick={() => setSelectedChart(chart)}
+                    isSelected={activeChart === chart}
+                  />
+                ))}
+                {filteredRemaining.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: '#475569', fontSize: 11 }}>
+                    No charts in this category
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Grid of chart cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: columnCount === 1 ? '1fr' : 'repeat(auto-fit, minmax(500px, 1fr))',
-        gap: 16,
-      }}>
-        {filteredCharts.map((chart, i) => (
-          <ChartCard key={`${chart.analysisType}-${chart.title}-${i}`} config={chart} onFilterSelect={onFilterSelect} activeFilter={activeFilter} />
-        ))}
+      {/* ── RIGHT DETAIL PANEL ─────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#0d1017', overflow: 'auto' }}>
+        {activeChart ? (
+          <ChartCard
+            key={`${activeChart.analysisType}-${activeChart.title}`}
+            config={activeChart}
+            onFilterSelect={onFilterSelect}
+            activeFilter={activeFilter}
+          />
+        ) : (
+          <div style={{ margin: 'auto', color: '#64748b', textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📈</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Select a chart from the left to view it here</div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -120,6 +120,7 @@ function App() {
           const res = await window.electron.runAnalysis(schema.tableName, task.analysisType, activeFilter || undefined);
           if (res.success) {
             if (res.chartConfig)  generatedCharts.push(res.chartConfig);
+            if (res.chartConfigs) generatedCharts.push(...res.chartConfigs);
             if (res.insights)     generatedInsights.push(...res.insights);
           }
         } catch (err) {

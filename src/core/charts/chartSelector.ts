@@ -1,16 +1,21 @@
-﻿import { GroupAggregationResult } from '../analytics/groupAggregation.js';
+import { GroupAggregationResult } from '../analytics/groupAggregation.js';
 import { DescriptiveStatsResult } from '../analytics/descriptiveStats.js';
 import { CorrelationResult } from '../analytics/correlation.js';
 import { TimeSeriesResult } from '../analytics/timeSeries.js';
 import { ChartConfig } from './chartTypes.js';
 
+/** Single result → single ChartConfig (for group aggregation) */
 export function groupAggregationToChart(result: GroupAggregationResult): ChartConfig {
+  const isCount = result.mode === 'count';
+  const title = isCount
+    ? `${result.categoryColumn} Distribution`
+    : `Avg ${result.numericColumn} by ${result.categoryColumn}`;
   return {
     chartType: 'bar',
     availableTypes: ['bar', 'horizontal_bar', 'pie', 'donut', 'funnel', 'radar'],
-    title: `${result.numericColumn} by ${result.categoryColumn}`,
+    title,
     xAxisLabel: result.categoryColumn,
-    yAxisLabel: `Avg ${result.numericColumn}`,
+    yAxisLabel: isCount ? 'Count' : `Avg ${result.numericColumn}`,
     data: result.rows.map(r => ({
       label: r.category,
       value: r.avg_value,
@@ -19,6 +24,11 @@ export function groupAggregationToChart(result: GroupAggregationResult): ChartCo
     analysisType: 'group_aggregation',
     sourceColumns: [result.categoryColumn, result.numericColumn],
   };
+}
+
+/** Array of results → array of ChartConfigs */
+export function groupAggregationToCharts(results: GroupAggregationResult[]): ChartConfig[] {
+  return results.map(groupAggregationToChart);
 }
 
 export function descriptiveStatsToChart(result: DescriptiveStatsResult): ChartConfig {
@@ -46,30 +56,40 @@ export function descriptiveStatsToChart(result: DescriptiveStatsResult): ChartCo
   };
 }
 
+/** Single correlation result → ChartConfig */
 export function correlationToChart(result: CorrelationResult): ChartConfig {
+  const strength = Math.abs(result.correlation);
+  const dir = result.correlation >= 0 ? 'positive' : 'negative';
+  const label = strength >= 0.7 ? `Strong ${dir}` : strength >= 0.4 ? `Moderate ${dir}` : `Weak ${dir}`;
   return {
     chartType: 'scatter',
     availableTypes: ['scatter'],
-    title: `${result.column1} vs ${result.column2} (r = ${result.correlation})`,
+    title: `${result.column1} vs ${result.column2} — r = ${result.correlation.toFixed(2)} (${label})`,
     xAxisLabel: result.column1,
     yAxisLabel: result.column2,
-    scatterData: result.points.map(p => ({
-      x: p.x,
-      y: p.y,
-    })),
+    scatterData: result.points.map(p => ({ x: p.x, y: p.y })),
     correlation: result.correlation,
     analysisType: 'correlation',
     sourceColumns: [result.column1, result.column2],
   };
 }
 
+/** Array of correlation results → array of ChartConfigs */
+export function correlationToCharts(results: CorrelationResult[]): ChartConfig[] {
+  return results.map(correlationToChart);
+}
+
+/** Single time series result → ChartConfig */
 export function timeSeriesToChart(result: TimeSeriesResult): ChartConfig {
+  const isCount = result.mode === 'count';
   return {
     chartType: 'area',
     availableTypes: ['area', 'line', 'bar'],
-    title: `${result.numericColumn} over ${result.dateColumn}`,
+    title: isCount
+      ? `Employee Count by ${result.dateColumn}`
+      : `Avg ${result.numericColumn} over ${result.dateColumn}`,
     xAxisLabel: result.dateColumn,
-    yAxisLabel: `Avg ${result.numericColumn}`,
+    yAxisLabel: isCount ? 'Count' : `Avg ${result.numericColumn}`,
     data: result.points.map(p => ({
       label: p.period,
       value: p.value,
@@ -77,4 +97,9 @@ export function timeSeriesToChart(result: TimeSeriesResult): ChartConfig {
     analysisType: 'time_series',
     sourceColumns: [result.dateColumn, result.numericColumn],
   };
+}
+
+/** Array of time series results → array of ChartConfigs */
+export function timeSeriesToCharts(results: TimeSeriesResult[]): ChartConfig[] {
+  return results.map(timeSeriesToChart);
 }

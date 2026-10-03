@@ -16,62 +16,87 @@ export interface CorrelationResult {
   points: ScatterPoint[];
 }
 
+function isDateLike(name: string): boolean {
+  return /year|date|time|month|quarter|period/i.test(name);
+}
+
+function buildFilter(filter?: ActiveFilter): string {
+  if (!filter) return '';
+  return `AND "${filter.column.replace(/"/g, '""')}" = '${String(filter.value).replace(/'/g, "''")}'`;
+}
+
 /**
- * Computes Pearson correlation coefficient between two numeric columns and extracts sample points for scatter visualization.
+ * Returns up to 4 scatter charts for the most strongly-correlated numeric pairs.
+ * Year/date-like columns are excluded from correlation analysis.
  */
 export async function runCorrelation(
   tableName: string,
   schema: TableSchema,
   queryFn: QueryFunction,
   filter?: ActiveFilter
-): Promise<CorrelationResult> {
-  const numericColumns = getPrioritizedNumericColumns(schema);
+): Promise<CorrelationResult[]> {
+  const numericColumns = getPrioritizedNumericColumns(schema).filter(
+    c => !isDateLike(c.name)
+  );
 
   if (numericColumns.length < 2) {
-    throw new Error('correlation analysis requires at least two numeric columns');
+    throw new Error('correlation analysis requires at least two non-date numeric columns');
   }
 
-  const col1 = numericColumns[0].name;
-  const col2 = numericColumns[1].name;
+  const filterClause = buildFilter(filter);
 
-  const esc1 = `"${col1.replace(/"/g, '""')}"`;
-  const esc2 = `"${col2.replace(/"/g, '""')}"`;
+  // Build all unique pairs, compute correlation, take top-4 by |r|
+  const pairCorrelations: { col1: string; col2: string; corr: number }[] = [];
 
-  const filterClause = filter 
-    ? `AND "${filter.column.replace(/"/g, '""')}" = '${String(filter.value).replace(/'/g, "''")}'` 
-    : '';
+  for (let i = 0; i < numericColumns.length; i++) {
+    for (let j = i + 1; j < numericColumns.length; j++) {
+      const col1 = numericColumns[i].name;
+      const col2 = numericColumns[j].name;
+      const esc1 = `"${col1.replace(/"/g, '""')}"`;
+      const esc2 = `"${col2.replace(/"/g, '""')}"`;
+      try {
+        const corrRows = await queryFn(`
+          SELECT ROUND(COALESCE(CORR(TRY_CAST(${esc1} AS DOUBLE), TRY_CAST(${esc2} AS DOUBLE)), 0), 4) AS corr_coef
+          FROM ${tableName}
+          WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
+            ${filterClause}
+        `);
+        const corr = Number(corrRows[0]?.corr_coef ?? 0);
+        pairCorrelations.push({ col1, col2, corr });
+      } catch { /* skip bad pair */ }
+    }
+  }
 
-  // Compute Pearson correlation coefficient
-  const corrRows = await queryFn(`
-    SELECT
-      ROUND(COALESCE(CORR(${esc1}, ${esc2}), 0), 4) AS corr_coef
-    FROM ${tableName}
-    WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
-      ${filterClause}
-  `);
+  // Sort by absolute correlation descending, take top 4
+  pairCorrelations.sort((a, b) => Math.abs(b.corr) - Math.abs(a.corr));
+  const topPairs = pairCorrelations.slice(0, 4);
 
-  const correlation = Number(corrRows[0]?.corr_coef ?? 0);
+  const results: CorrelationResult[] = [];
+  for (const pair of topPairs) {
+    const esc1 = `"${pair.col1.replace(/"/g, '""')}"`;
+    const esc2 = `"${pair.col2.replace(/"/g, '""')}"`;
+    try {
+      const pointRows = await queryFn(`
+        SELECT
+          TRY_CAST(${esc1} AS DOUBLE) AS x,
+          TRY_CAST(${esc2} AS DOUBLE) AS y
+        FROM ${tableName}
+        WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
+          ${filterClause}
+        LIMIT 200
+      `);
+      results.push({
+        column1: pair.col1,
+        column2: pair.col2,
+        correlation: pair.corr,
+        points: pointRows.map(r => ({ x: Number(r.x), y: Number(r.y) })),
+      });
+    } catch { /* skip */ }
+  }
 
-  // Extract up to 200 scatter points
-  const pointRows = await queryFn(`
-    SELECT
-      ${esc1} AS x,
-      ${esc2} AS y
-    FROM ${tableName}
-    WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
-      ${filterClause}
-    LIMIT 200
-  `);
+  if (results.length === 0) {
+    throw new Error('correlation: could not compute any numeric pair');
+  }
 
-  const points: ScatterPoint[] = pointRows.map(r => ({
-    x: Number(r.x),
-    y: Number(r.y),
-  }));
-
-  return {
-    column1: col1,
-    column2: col2,
-    correlation,
-    points,
-  };
+  return results;
 }

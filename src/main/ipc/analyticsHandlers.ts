@@ -5,10 +5,10 @@ import { runDescriptiveStats } from '../../core/analytics/descriptiveStats.js';
 import { runCorrelation } from '../../core/analytics/correlation.js';
 import { runTimeSeries } from '../../core/analytics/timeSeries.js';
 import {
-  groupAggregationToChart,
+  groupAggregationToCharts,
   descriptiveStatsToChart,
-  correlationToChart,
-  timeSeriesToChart,
+  correlationToCharts,
+  timeSeriesToCharts,
 } from '../../core/charts/chartSelector.js';
 import {
   generateGroupAggregationInsights,
@@ -24,10 +24,10 @@ export function registerAnalyticsHandlers(query: (sql: string) => Promise<any[]>
       const schema = await detectSchema(tableName, query);
 
       if (analysisType === 'group_aggregation') {
-        const result = await runGroupAggregation(tableName, schema, query, filter);
-        const chartConfig = groupAggregationToChart(result);
-        const insights = generateGroupAggregationInsights(tableName, result, schema);
-        return { success: true, chartConfig, insights };
+        const results = await runGroupAggregation(tableName, schema, query, filter);
+        const chartConfigs = groupAggregationToCharts(results);
+        const insights = results.flatMap(r => generateGroupAggregationInsights(tableName, r, schema));
+        return { success: true, chartConfigs, insights };
       }
 
       if (analysisType === 'descriptive_stats') {
@@ -38,17 +38,17 @@ export function registerAnalyticsHandlers(query: (sql: string) => Promise<any[]>
       }
 
       if (analysisType === 'correlation') {
-        const result = await runCorrelation(tableName, schema, query, filter);
-        const chartConfig = correlationToChart(result);
-        const insights = generateCorrelationInsights(tableName, result, schema);
-        return { success: true, chartConfig, insights };
+        const results = await runCorrelation(tableName, schema, query, filter);
+        const chartConfigs = correlationToCharts(results);
+        const insights = results.flatMap(r => generateCorrelationInsights(tableName, r, schema));
+        return { success: true, chartConfigs, insights };
       }
 
       if (analysisType === 'time_series') {
-        const result = await runTimeSeries(tableName, schema, query, filter);
-        const chartConfig = timeSeriesToChart(result);
-        const insights = generateTimeSeriesInsights(tableName, result, schema);
-        return { success: true, chartConfig, insights };
+        const results = await runTimeSeries(tableName, schema, query, filter);
+        const chartConfigs = timeSeriesToCharts(results);
+        const insights = results.flatMap(r => generateTimeSeriesInsights(tableName, r, schema));
+        return { success: true, chartConfigs, insights };
       }
 
       return { success: false, error: `Analysis type "${analysisType}" not recognized` };

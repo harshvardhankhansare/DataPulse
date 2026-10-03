@@ -1,18 +1,42 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
 release/
 build/
+
+# Logs
 *.log
+
+# OS / Editor
 .DS_Store
 .vscode/
 .idea/
+
+# AI / Agent tools
 .claude/
+.freebuff/
+graphify-out/
+
+# Database files
 *.db
 *.duckdb
+
+# Test data
 test-data/*.csv
 test-phase4-all.mjs
-agent-progress.md
-REVOLUTIONARY_ROADMAP.md
-graphify-out/
+
+# Markdown docs (keep private)
+*.md
+!LICENSE
+
+# Internal docs
 docs/phases/
 docs/contributing/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key

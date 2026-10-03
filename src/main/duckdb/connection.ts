@@ -51,19 +51,28 @@ export function initDuckDB(): Promise<void> {
   });
 }
 
+let queryQueue: Promise<void> = Promise.resolve();
+
 export function query(sql: string): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    if (!connection) {
-      reject(new Error('DuckDB connection not initialized'));
-      return;
-    }
-
-    connection.all(sql, (err, rows) => {
-      if (err) {
-        reject(new Error(`Query failed: ${err.message}\nSQL: ${sql}`));
-        return;
-      }
-      resolve(normalizeRows(rows) as any[]);
+    queryQueue = queryQueue.then(() => {
+      return new Promise<void>((next) => {
+        if (!connection) {
+          reject(new Error('DuckDB connection not initialized'));
+          next();
+          return;
+        }
+        connection.all(sql, (err, rows) => {
+          if (err) {
+            reject(new Error(`Query failed: ${err.message}\nSQL: ${sql}`));
+          } else {
+            resolve(normalizeRows(rows) as any[]);
+          }
+          next();
+        });
+      });
+    }).catch(() => {
+      // prevent queue from breaking on previous errors
     });
   });
 }

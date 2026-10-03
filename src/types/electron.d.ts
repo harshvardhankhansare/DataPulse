@@ -37,6 +37,7 @@ export interface ElectronAPI {
   runAnalysis: (tableName: string, analysisType: string, filter?: ActiveFilter) => Promise<{
     success: boolean;
     chartConfig?: ChartConfig;
+    chartConfigs?: ChartConfig[];
     insights?: Insight[];
     error?: string;
   }>;
