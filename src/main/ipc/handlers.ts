@@ -20,9 +20,9 @@ export function registerIpcHandlers() {
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile'],
       filters: [
-        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'xls', 'json', 'parquet'] },
+        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'json', 'parquet'] },
         { name: 'CSV files', extensions: ['csv'] },
-        { name: 'Excel Spreadsheets', extensions: ['xlsx', 'xls'] },
+        { name: 'Excel Spreadsheets', extensions: ['xlsx'] },
         { name: 'JSON files', extensions: ['json'] },
         { name: 'Parquet files', extensions: ['parquet'] },
         { name: 'All files', extensions: ['*'] },

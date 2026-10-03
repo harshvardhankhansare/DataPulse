@@ -9,7 +9,7 @@ export function registerLakehouseHandlers(query: (sql: string) => Promise<any[]>
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'xls', 'json', 'parquet'] },
+        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'json', 'parquet'] },
         { name: 'All files', extensions: ['*'] },
       ],
     });
