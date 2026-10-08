@@ -9,6 +9,11 @@ import { useAppStore } from '../store/useAppStore';
 
 export default function ImportPanel() {
   const applyImportResult = useAppStore(s => s.applyImportResult);
+  const schema = useAppStore(s => s.schema);
+  const fileName = useAppStore(s => s.fileName);
+  const [isSaving, setSaving] = useState(false);
+  const [isOpening, setOpening] = useState(false);
+  const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lakehouseData, setLakehouseData] = useState<{
@@ -95,6 +100,50 @@ export default function ImportPanel() {
     }
   };
 
+  /* ── Project persistence actions ─────────────────────── */
+
+  const handleSaveProject = async () => {
+    if (!schema || isSaving) return;
+    setSaving(true);
+    setProjectMsg(null);
+    try {
+      const res = await window.electron.saveProject(schema.tableName, fileName);
+      if (res.success && res.filePath) {
+        setProjectMsg(`✓ Project saved: ${res.filePath}`);
+      } else if (!res.canceled && res.error) {
+        setProjectMsg(`Save failed: ${res.error}`);
+      }
+    } catch (err) {
+      setProjectMsg(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenProject = async () => {
+    if (isOpening) return;
+    setOpening(true);
+    setProjectMsg(null);
+    try {
+      const res = await window.electron.openProject();
+      if (res.success && res.schema && res.quality && res.applicableAnalyses) {
+        applyImportResult({
+          schema: res.schema,
+          quality: res.quality,
+          applicableAnalyses: res.applicableAnalyses,
+          fileName: res.fileName,
+        });
+        setProjectMsg(`✓ Project loaded: ${res.fileName}`);
+      } else if (!res.canceled && res.error) {
+        setProjectMsg(`Open failed: ${res.error}`);
+      }
+    } catch (err) {
+      setProjectMsg(`Open failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setOpening(false);
+    }
+  };
+
   return (
     <div>
       <input
@@ -156,6 +205,72 @@ export default function ImportPanel() {
         {isLoading ? 'Importing…' : 'Load File'}
       </button>
 
+      {/* Save / Open Project row */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+        <button
+          onClick={handleSaveProject}
+          disabled={!schema || isSaving}
+          title={schema ? 'Save the current dataset (with all edits) as a .duckdb project file' : 'Load a dataset first'}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '7px 10px',
+            background: '#141b2e',
+            border: '1px solid #243050',
+            borderRadius: 7,
+            color: schema ? '#7dd3fc' : '#3a4660',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: !schema || isSaving ? 'not-allowed' : 'pointer',
+            transition: 'all 0.14s',
+          }}
+        >
+          {isSaving ? (
+            <span className="dp-spinner" style={{ width: 11, height: 11 }} />
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+            </svg>
+          )}
+          {isSaving ? 'Saving…' : 'Save Project'}
+        </button>
+
+        <button
+          onClick={handleOpenProject}
+          disabled={isOpening}
+          title="Open a previously saved .duckdb project file"
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '7px 10px',
+            background: '#141b2e',
+            border: '1px solid #243050',
+            borderRadius: 7,
+            color: isOpening ? '#3a4660' : '#7dd3fc',
+            fontSize: 11,
+            fontWeight: 600,
+            cursor: isOpening ? 'not-allowed' : 'pointer',
+            transition: 'all 0.14s',
+          }}
+        >
+          {isOpening ? (
+            <span className="dp-spinner" style={{ width: 11, height: 11 }} />
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          )}
+          {isOpening ? 'Opening…' : 'Open Project'}
+        </button>
+      </div>
+
       {/* Supported formats */}
       <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
         {['.csv', '.xlsx', '.json', '.parquet'].map(ext => (
@@ -174,6 +289,19 @@ export default function ImportPanel() {
           borderRadius: 6, fontSize: 11, color: '#f87171', lineHeight: 1.4,
         }}>
           {error}
+        </div>
+      )}
+
+      {projectMsg && (
+        <div style={{
+          marginTop: 8, padding: '7px 10px',
+          background: projectMsg.startsWith('✓') ? '#0d2137' : '#2a1a1a',
+          border: `1px solid ${projectMsg.startsWith('✓') ? '#1e4d78' : '#5c2020'}`,
+          borderRadius: 6, fontSize: 11,
+          color: projectMsg.startsWith('✓') ? '#7dd3fc' : '#f87171',
+          lineHeight: 1.4, wordBreak: 'break-all',
+        }}>
+          {projectMsg}
         </div>
       )}
 

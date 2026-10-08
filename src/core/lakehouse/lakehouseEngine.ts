@@ -110,7 +110,7 @@ export async function createJoinView(
   const rightProjSql = rightProjections.length > 0 ? `, ${rightProjections.join(', ')}` : '';
 
   const sql = `
-    CREATE OR REPLACE VIEW ${escView} AS 
+    CREATE OR REPLACE TABLE ${escView} AS 
     SELECT 
       l.*${rightProjSql}
     FROM ${escLeft} l

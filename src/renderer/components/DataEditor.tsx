@@ -13,6 +13,8 @@ export default function DataEditor() {
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [snapshotCount, setSnapshotCount] = useState(0);
 
   // Cell editing state
   const [editingCell, setEditingCell] = useState<{ rowid: number; column: string } | null>(null);
@@ -83,6 +85,8 @@ export default function DataEditor() {
         // Optimistically update local row
         setRows(prev => prev.map(r => r.rowid === rowid ? { ...r, [column]: parsedVal } : r));
         bumpDataVersion();
+        await loadData();
+        await refreshUndoStatus();
       } else {
         setStatusMessage({ text: `Update error: ${res.error}`, type: 'error' });
       }
@@ -100,8 +104,9 @@ export default function DataEditor() {
       const res = await window.electron.deleteRow(schema.tableName, rowid);
       if (res.success) {
         setStatusMessage({ text: '✓ Row deleted', type: 'info' });
-        loadData();
+        await loadData();
         bumpDataVersion();
+        await refreshUndoStatus();
       } else {
         setStatusMessage({ text: `Delete error: ${res.error}`, type: 'error' });
       }
@@ -118,8 +123,9 @@ export default function DataEditor() {
       const res = await window.electron.cleanData(schema.tableName, action);
       if (res.success) {
         setStatusMessage({ text: `✓ ${res.message}`, type: 'success' });
-        loadData();
+        await loadData();
         bumpDataVersion();
+        await refreshUndoStatus();
       } else {
         setStatusMessage({ text: `Cleaning error: ${res.error}`, type: 'error' });
       }
@@ -143,8 +149,86 @@ export default function DataEditor() {
     }
   };
 
-  const totalPages = Math.ceil(totalCount / pageSize);
+  // Refresh undo status from main process
+  const refreshUndoStatus = useCallback(async () => {
+    if (!schema?.tableName) return;
+    try {
+      const result = await window.electron.getUndoStatus(schema.tableName);
+      if (result.success) {
+        console.log('[undo-ui] refreshUndoStatus received:', result);
+        setCanUndo(result.canUndo);
+        setSnapshotCount(result.snapshotCount);
+      } else {
+        console.error('[undo-ui] refreshUndoStatus error:', result.error);
+        setCanUndo(false);
+        setSnapshotCount(0);
+      }
+    } catch (err) {
+      console.error('[undo-ui] refreshUndoStatus error:', err);
+      setCanUndo(false);
+      setSnapshotCount(0);
+    }
+  }, [schema?.tableName]);
 
+  // Undo last destructive operation
+  const handleUndo = async () => {
+    if (!schema || !canUndo) return;
+    try {
+      const res = await window.electron.undo(schema.tableName);
+      if (res.success) {
+        setStatusMessage({ text: '✓ Undo successful — previous state restored', type: 'success' });
+        await loadData();
+        bumpDataVersion();
+        // Refresh undo status to update canUndo and snapshotCount
+        await refreshUndoStatus();
+      } else {
+        setStatusMessage({ text: `Undo error: ${res.error}`, type: 'error' });
+      }
+    } catch (err) {
+      console.error('Undo failed:', err);
+      setStatusMessage({ text: 'Undo failed', type: 'error' });
+    }
+  };
+
+  // Check undo status when table changes
+  useEffect(() => {
+    if (!schema?.tableName) return;
+    window.electron.getUndoStatus(schema.tableName).then(result => {
+      if (result.success) {
+        setCanUndo(result.canUndo);
+        setSnapshotCount(result.snapshotCount);
+      } else {
+        console.error('[undo-ui] getUndoStatus error:', result.error);
+        setCanUndo(false);
+        setSnapshotCount(0);
+      }
+    }).catch(err => {
+      console.error('[undo-ui] getUndoStatus error:', err);
+      setCanUndo(false);
+      setSnapshotCount(0);
+    });
+  }, [schema?.tableName]);
+
+  // Check undo status when data changes (as a backup to explicit calls)
+  useEffect(() => {
+    if (!schema?.tableName) return;
+    window.electron.getUndoStatus(schema.tableName).then(result => {
+      if (result.success) {
+        setCanUndo(result.canUndo);
+        setSnapshotCount(result.snapshotCount);
+      } else {
+        console.error('[undo-ui] getUndoStatus error:', result.error);
+        setCanUndo(false);
+        setSnapshotCount(0);
+      }
+    }).catch(err => {
+      console.error('[undo-ui] getUndoStatus error:', err);
+      setCanUndo(false);
+      setSnapshotCount(0);
+    });
+  }, [schema?.tableName, rows.length, totalCount]);
+
+  const totalPages = Math.ceil(totalCount / pageSize);
   return (
     <div className="dp-card" style={{ marginTop: 0, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* ─── Top Control & Cleaning Toolbar ─── */}
@@ -185,6 +269,16 @@ export default function DataEditor() {
             title="Scan the table and delete identical duplicate rows"
           >
             🧹 Remove Duplicates
+          </button>
+
+          <button
+            className="dp-btn dp-btn-ghost"
+            style={{ padding: '6px 11px', fontSize: 11, border: '1px solid #1e293b', opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'not-allowed' }}
+            onClick={handleUndo}
+            disabled={!canUndo}
+            title={canUndo ? `Undo last change (${snapshotCount} snapshot${snapshotCount > 1 ? 's' : ''} available)` : 'No undo history'}
+          >
+            ↩️ Undo
           </button>
 
           {/* Smart Null Fixer Dropdown */}

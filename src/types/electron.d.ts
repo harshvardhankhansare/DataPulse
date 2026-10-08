@@ -17,16 +17,7 @@ import {
 
 export interface ElectronAPI {
   selectFile: () => Promise<string | null>;
-  selectCsvFile: () => Promise<string | null>;
   importFile: (filePath: string) => Promise<{
-    success: boolean;
-    schema?: TableSchema;
-    quality?: QualityReport;
-    applicableAnalyses?: AnalysisTask[];
-    format?: string;
-    error?: string;
-  }>;
-  importCsv: (filePath: string) => Promise<{
     success: boolean;
     schema?: TableSchema;
     quality?: QualityReport;
@@ -138,11 +129,6 @@ export interface ElectronAPI {
     joinCandidates?: JoinCandidate[];
     error?: string;
   }>;
-  detectJoinCandidates: (tables: LakehouseTable[]) => Promise<{
-    success: boolean;
-    candidates?: JoinCandidate[];
-    error?: string;
-  }>;
   createJoinView: (plan: JoinPlan) => Promise<JoinViewResult>;
   getTableRows: (tableName: string, limit?: number, offset?: number, search?: string) => Promise<{
     success: boolean;
@@ -168,6 +154,32 @@ export interface ElectronAPI {
     success: boolean;
     filePath?: string;
     canceled?: boolean;
+    error?: string;
+  }>;
+  saveProject: (activeTable: string, fileName: string | null) => Promise<{
+    success: boolean;
+    filePath?: string;
+    canceled?: boolean;
+    error?: string;
+  }>;
+  openProject: () => Promise<{
+    success: boolean;
+    schema?: TableSchema;
+    quality?: QualityReport;
+    applicableAnalyses?: AnalysisTask[];
+    fileName?: string;
+    canceled?: boolean;
+    error?: string;
+  }>;
+  undo: (tableName: string) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
+  getUndoStatus: (tableName: string) => Promise<{
+    success: boolean;
+    canUndo: boolean;
+    snapshotCount: number;
     error?: string;
   }>;
 }
