@@ -6,6 +6,7 @@ import {
 } from '@core/lakehouse/lakehouseTypes';
 import SmartJoinModal from './SmartJoinModal';
 import { useAppStore } from '../store/useAppStore';
+import { useToast } from './Toast';
 
 export default function ImportPanel() {
   const applyImportResult = useAppStore(s => s.applyImportResult);
@@ -13,18 +14,16 @@ export default function ImportPanel() {
   const fileName = useAppStore(s => s.fileName);
   const [isSaving, setSaving] = useState(false);
   const [isOpening, setOpening] = useState(false);
-  const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [lakehouseData, setLakehouseData] = useState<{
     tables: LakehouseTable[];
     candidates: JoinCandidate[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { addToast } = useToast();
 
   const handleImport = async (filePath: string, name?: string) => {
     setIsLoading(true);
-    setError(null);
     try {
       const result = await window.electron.importFile(filePath);
       if (result.success && result.schema && result.quality && result.applicableAnalyses) {
@@ -34,11 +33,12 @@ export default function ImportPanel() {
           applicableAnalyses: result.applicableAnalyses,
           fileName: name || filePath.split(/[\\/]/).pop(),
         });
+        addToast(`✓ Imported ${name || filePath.split(/[\\/]/).pop()} successfully`, 'success');
       } else {
-        setError(result.error || 'Import failed');
+        addToast(result.error || 'Import failed', 'error');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      addToast(err instanceof Error ? err.message : 'Unknown error occurred', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +46,6 @@ export default function ImportPanel() {
 
   const handleMultiImport = async (filePaths: string[]) => {
     setIsLoading(true);
-    setError(null);
     try {
       const res = await window.electron.importMultipleFiles(filePaths);
       if (res.success && res.tables && res.tables.length > 0) {
@@ -54,11 +53,12 @@ export default function ImportPanel() {
           tables: res.tables,
           candidates: res.joinCandidates || [],
         });
+        addToast(`✓ Imported ${res.tables.length} files successfully`, 'success');
       } else {
-        setError(res.error || 'Multi-file lakehouse import failed');
+        addToast(res.error || 'Multi-file lakehouse import failed', 'error');
       }
     } catch (err: any) {
-      setError(err.message || 'Error during multi-file ingestion');
+      addToast(err.message || 'Error during multi-file ingestion', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +83,7 @@ export default function ImportPanel() {
         fileInputRef.current?.click();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to select file');
+      addToast(err instanceof Error ? err.message : 'Unable to select file', 'error');
     }
   };
 
@@ -105,16 +105,15 @@ export default function ImportPanel() {
   const handleSaveProject = async () => {
     if (!schema || isSaving) return;
     setSaving(true);
-    setProjectMsg(null);
     try {
       const res = await window.electron.saveProject(schema.tableName, fileName);
       if (res.success && res.filePath) {
-        setProjectMsg(`✓ Project saved: ${res.filePath}`);
+        addToast(`✓ Project saved: ${res.filePath}`, 'success');
       } else if (!res.canceled && res.error) {
-        setProjectMsg(`Save failed: ${res.error}`);
+        addToast(`Save failed: ${res.error}`, 'error');
       }
     } catch (err) {
-      setProjectMsg(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      addToast(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -123,7 +122,6 @@ export default function ImportPanel() {
   const handleOpenProject = async () => {
     if (isOpening) return;
     setOpening(true);
-    setProjectMsg(null);
     try {
       const res = await window.electron.openProject();
       if (res.success && res.schema && res.quality && res.applicableAnalyses) {
@@ -133,12 +131,12 @@ export default function ImportPanel() {
           applicableAnalyses: res.applicableAnalyses,
           fileName: res.fileName,
         });
-        setProjectMsg(`✓ Project loaded: ${res.fileName}`);
+        addToast(`✓ Project loaded: ${res.fileName}`, 'success');
       } else if (!res.canceled && res.error) {
-        setProjectMsg(`Open failed: ${res.error}`);
+        addToast(`Open failed: ${res.error}`, 'error');
       }
     } catch (err) {
-      setProjectMsg(`Open failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      addToast(`Open failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
     } finally {
       setOpening(false);
     }
@@ -281,29 +279,6 @@ export default function ImportPanel() {
           }}>{ext}</span>
         ))}
       </div>
-
-      {error && (
-        <div style={{
-          marginTop: 8, padding: '7px 10px',
-          background: '#2a1a1a', border: '1px solid #5c2020',
-          borderRadius: 6, fontSize: 11, color: '#f87171', lineHeight: 1.4,
-        }}>
-          {error}
-        </div>
-      )}
-
-      {projectMsg && (
-        <div style={{
-          marginTop: 8, padding: '7px 10px',
-          background: projectMsg.startsWith('✓') ? '#0d2137' : '#2a1a1a',
-          border: `1px solid ${projectMsg.startsWith('✓') ? '#1e4d78' : '#5c2020'}`,
-          borderRadius: 6, fontSize: 11,
-          color: projectMsg.startsWith('✓') ? '#7dd3fc' : '#f87171',
-          lineHeight: 1.4, wordBreak: 'break-all',
-        }}>
-          {projectMsg}
-        </div>
-      )}
 
       {lakehouseData && (
         <SmartJoinModal

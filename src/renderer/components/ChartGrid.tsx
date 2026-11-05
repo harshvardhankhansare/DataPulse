@@ -53,6 +53,7 @@ export function ChartCard({
   const [activeType, setActiveType] = useState<ChartType>(config.chartType);
   const [sortOrder, setSortOrder] = useState<SortOrder>('default');
   const [metricScenario, setMetricScenario] = useState<MetricScenario>('avg');
+  const [selectedDataPoint, setSelectedDataPoint] = useState<ChartDataPoint | null>(null);
 
   // Has sum/total value scenario
   const hasMultipleMetrics = Boolean(config.data && config.data.some(d => d.value2 !== undefined));
@@ -667,9 +668,16 @@ export function ChartCard({
     chart.setOption(option, true);
 
     const handleClick = (params: any) => {
-      if (params && params.name && onFilterSelect) {
-        const col = config.xAxisLabel || config.sourceColumns[0];
-        onFilterSelect({ column: col, value: params.name });
+      if (params && params.name) {
+        // Find the corresponding data point
+        const clickedDataPoint = processedData.find(d => d.label === params.name);
+        if (clickedDataPoint) {
+          setSelectedDataPoint(clickedDataPoint);
+        }
+        if (onFilterSelect) {
+          const col = config.xAxisLabel || config.sourceColumns[0];
+          onFilterSelect({ column: col, value: params.name });
+        }
       }
     };
     chart.off('click');
@@ -928,6 +936,58 @@ export function ChartCard({
             <div style={{ fontWeight: 800, color: '#34d399', fontSize: 20, fontFamily: 'monospace' }}>
               {quickStats.max}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Data Point Detail View */}
+      {selectedDataPoint && (
+        <div style={{
+          background: '#161b2a',
+          borderRadius: 8,
+          padding: '12px 16px',
+          margin: '8px 0',
+          border: '1px solid #222b42',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>Selected Item</div>
+              <div style={{ fontWeight: 800, color: '#f1f5f9', fontSize: 16, fontFamily: 'monospace' }}>
+                {selectedDataPoint.label}
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedDataPoint(null)}
+              style={{
+                background: 'transparent',
+                border: '1px solid #3b82f6',
+                color: '#60a5fa',
+                borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s',
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: 10, fontWeight: 600 }}>Value</div>
+              <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: 18, fontFamily: 'monospace' }}>
+                {Number(selectedDataPoint.value).toLocaleString()}
+              </div>
+            </div>
+            {selectedDataPoint.value2 !== undefined && (
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: 10, fontWeight: 600 }}>Secondary Value</div>
+                <div style={{ fontWeight: 800, color: '#a78bfa', fontSize: 18, fontFamily: 'monospace' }}>
+                  {Number(selectedDataPoint.value2).toLocaleString()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,15 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 
+interface OutlierItem {
+  rowid: number;
+  column: string;
+  originalValue: number;
+  suggestedValue: number;
+  replacementType: 'median' | 'mean';
+  lowerBound: number;
+  upperBound: number;
+}
+
 const MAX_UNDO_SNAPSHOTS = 5;
 let undoCounter = 0;
 
@@ -296,6 +306,84 @@ export function registerEditorHandlers(query: (sql: string) => Promise<any[]>) {
     } catch (error) {
       console.error('editor:undo-status failed:', error);
       return { success: false, canUndo: false, snapshotCount: 0, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  /* ── Outlier detection: detect outliers using IQR method ── */
+  ipcMain.handle('editor:detect-outliers', async (_event, tableName: string) => {
+    try {
+      // Get table schema to identify numeric columns
+      const schemaRes = await query(`PRAGMA table_info('${tableName.replace(/"/g, '""')}')`);
+      const numericTypes = new Set(['BIGINT', 'INTEGER', 'DOUBLE', 'FLOAT', 'DECIMAL', 'REAL', 'NUMERIC', 'NUMBER']);
+      const numericColumns = schemaRes
+        .map((col: any) => col.name)
+        .filter((colName: string) => {
+          const typeRes = schemaRes.find((c: any) => c.name === colName);
+          if (!typeRes) return false;
+          const type = typeRes.type.toUpperCase();
+          return numericTypes.has(type);
+        });
+
+      if (numericColumns.length === 0) {
+        return { success: true, outliers: [] };
+      }
+
+      const outliers: OutlierItem[] = [];
+
+      for (const column of numericColumns) {
+        const safeColumn = `"${column.replace(/"/g, '""')}"`;
+        const safeTable = `"${tableName.replace(/"/g, '""')}"`;
+
+        // Compute Q1, Q3, IQR, MEDIAN, AVG for the column
+        const statsRes = await query(`
+          SELECT
+            MIN(${safeColumn}) AS min_val,
+            MAX(${safeColumn}) AS max_val,
+            AVG(${safeColumn}) AS avg_val,
+            MEDIAN(${safeColumn}) AS median_val,
+            QUANTILE_CONT(${safeColumn}, 0.25) AS q1,
+            QUANTILE_CONT(${safeColumn}, 0.75) AS q3
+          FROM ${safeTable}
+        `);
+
+        if (statsRes.length === 0) continue;
+
+        const row = statsRes[0];
+        const q1 = Number(row.q1);
+        const q3 = Number(row.q3);
+        const iqr = q3 - q1;
+        const median = Number(row.median_val);
+
+        // Apply zero-variance guard: if IQR is 0, we cannot compute bounds, skip this column
+        if (iqr === 0) continue;
+
+        const lowerBound = q1 - 3 * iqr;
+        const upperBound = q3 + 3 * iqr;
+
+        // Select outliers: rows where column value is outside [lowerBound, upperBound]
+        const outlierRes = await query(`
+          SELECT rowid, ${safeColumn} AS originalValue
+          FROM ${safeTable}
+          WHERE ${safeColumn} < ${lowerBound} OR ${safeColumn} > ${upperBound}
+        `);
+
+        for (const outlierRow of outlierRes) {
+          outliers.push({
+            rowid: Number(outlierRow.rowid),
+            column,
+            originalValue: Number(outlierRow.originalValue),
+            suggestedValue: median, // Use median by default
+            replacementType: 'median',
+            lowerBound,
+            upperBound,
+          });
+        }
+      }
+
+      return { success: true, outliers };
+    } catch (error) {
+      console.error('editor:detect-outliers failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
 }

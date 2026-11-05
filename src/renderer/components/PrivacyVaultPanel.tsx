@@ -8,6 +8,7 @@ import {
 } from '@core/privacy/privacyTypes';
 import { maskValueInJs } from '@core/privacy/piiMasker';
 import { useAppStore } from '../store/useAppStore';
+import { useToast } from '../components/Toast';
 
 export default function PrivacyVaultPanel() {
   const schema = useAppStore(s => s.schema);
@@ -20,6 +21,7 @@ export default function PrivacyVaultPanel() {
   const [columnRules, setColumnRules] = useState<Record<string, { category: PiiCategory; strategy: MaskingStrategy }>>({});
   const [showConfirmPurge, setShowConfirmPurge] = useState(false);
   const [purgeSuccess, setPurgeSuccess] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   // Load audit report and airgap status
   const loadPrivacyData = async () => {
@@ -55,6 +57,7 @@ export default function PrivacyVaultPanel() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPrivacyData();
   }, [schema?.tableName]);
 
@@ -72,9 +75,11 @@ export default function PrivacyVaultPanel() {
       const res = await window.electron.applyMasking(schema.tableName, columnRules);
       if (res.success) {
         setIsMasked(true);
+        addToast('1-Click Anonymization applied successfully!', 'success');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to apply masking:', err);
+      addToast('Failed to apply anonymization: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -87,9 +92,11 @@ export default function PrivacyVaultPanel() {
       const res = await window.electron.revertMasking(schema.tableName);
       if (res.success) {
         setIsMasked(false);
+        addToast('Data reverted to raw view successfully!', 'success');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to revert masking:', err);
+      addToast('Failed to revert data: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -102,14 +109,16 @@ export default function PrivacyVaultPanel() {
       const res = await window.electron.purgeMemory();
       if (res.success) {
         setPurgeSuccess(`Zeroized all in-memory tables. Volatile RAM reclaimed.`);
+        addToast('Memory zeroized successfully!', 'success');
         {
           setTimeout(() => {
             resetData();
           }, 1200);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Purge error:', err);
+      addToast('Purge failed: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }

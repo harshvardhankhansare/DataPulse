@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   selectFile: () => ipcRenderer.invoke('select-file'),
@@ -67,5 +67,7 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('editor:undo', tableName),
   getUndoStatus: (tableName: string) =>
     ipcRenderer.invoke('editor:undo-status', tableName),
+  detectOutliers: (tableName: string) =>
+    ipcRenderer.invoke('editor:detect-outliers', tableName),
 });
 

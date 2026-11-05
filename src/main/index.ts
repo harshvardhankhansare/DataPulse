@@ -8,6 +8,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
+
+function createSplashWindow() {
+  const splashPath = path.join(__dirname, 'splash.html');
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 340,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    show: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splashWindow.loadFile(splashPath).catch((err) => {
+    console.error('Failed to load splash screen:', err);
+  });
+}
 
 function createWindow() {
   const indexPath = path.join(__dirname, '../renderer/index.html');
@@ -21,7 +44,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 720,
     center: true,
-    show: false, // shown on 'ready-to-show' to avoid a blank flash
+    show: false, // shown on 'ready-to-show' after splash transition
     title: 'Offline Data Intelligence',
     webPreferences: {
       preload: path.join(__dirname, '../preload.js'),
@@ -31,8 +54,15 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
+    // Hold splash screen briefly to show smooth startup progress animation
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+        splashWindow = null;
+      }
+      mainWindow?.show();
+      mainWindow?.focus();
+    }, 1600);
   });
 
   mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
@@ -54,6 +84,9 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   try {
+    // Display splash screen immediately
+    createSplashWindow();
+
     // Initialize DuckDB
     await initDuckDB();
 
@@ -62,6 +95,7 @@ app.whenReady().then(async () => {
 
     // Create the application window
     createWindow();
+
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChartConfig } from '@core/charts/chartTypes';
 import { ChartCard } from './ChartGrid';
 import { useAppStore } from '../store/useAppStore';
+import { useToast } from './Toast';
 
 interface AiServerState {
   available: boolean;
@@ -22,12 +23,15 @@ export default function AiQueryPanel() {
     provider: 'none',
     endpoint: 'http://127.0.0.1:1234/v1',
   });
+  const { addToast } = useToast();
 
   const [queryResult, setQueryResult] = useState<{
     sql?: string;
     rows?: Record<string, any>[];
     chartConfig?: ChartConfig | null;
     error?: string;
+    heuristic?: boolean;
+    heuristicExplanation?: string;
   } | null>(null);
 
   const checkConnection = async (url?: string) => {
@@ -36,16 +40,19 @@ export default function AiQueryPanel() {
       const status = await window.electron.checkAiStatus(url || customEndpoint);
       setServerState(status);
     } catch {
-      setServerState({
+      const errorState = {
         available: false,
         provider: 'none',
         endpoint: url || customEndpoint,
         error: 'Failed to connect to local AI server.',
-      });
+      };
+      setServerState(errorState);
+      addToast('Failed to connect to local AI server.', 'error');
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkConnection();
     const interval = setInterval(() => checkConnection(), 15000);
     return () => clearInterval(interval);
@@ -65,6 +72,8 @@ export default function AiQueryPanel() {
           sql: res.sql,
           rows: res.rows,
           chartConfig: res.chartConfig,
+          heuristic: res.heuristic,
+          heuristicExplanation: res.heuristicExplanation,
         });
       } else {
         setQueryResult({
@@ -425,9 +434,22 @@ export default function AiQueryPanel() {
                 marginBottom: '6px',
               }}>
                 <span style={{ fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>⚡</span> Generated DuckDB SQL:
+                  {queryResult.heuristic ? (
+                    <>
+                      <span>🧠</span> Heuristic Query:
+                      {queryResult.heuristicExplanation && (
+                        <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>
+                          ({queryResult.heuristicExplanation})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span>⚡</span> Generated DuckDB SQL:
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Validated & Executed In-Memory</span>
+                    </>
+                  )}
                 </span>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Validated & Executed In-Memory</span>
               </div>
               <div style={{
                 background: '#080c14',
@@ -435,7 +457,7 @@ export default function AiQueryPanel() {
                 padding: '12px 16px',
                 fontSize: '12px',
                 fontFamily: 'var(--font-mono)',
-                color: '#34d399',
+                color: queryResult.heuristic ? '#fbbf24' : '#34d399',
                 border: '1px solid #1e2638',
                 overflowX: 'auto',
               }}>

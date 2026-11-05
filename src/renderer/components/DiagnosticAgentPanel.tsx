@@ -20,6 +20,33 @@ export default function DiagnosticAgentPanel() {
   const chartRef = useRef<HTMLDivElement>(null);
   const echartsRef = useRef<echarts.ECharts | null>(null);
 
+  const runInvestigation = async (
+    metric?: string,
+    dimension?: string,
+    question?: string
+  ) => {
+    const targetM = metric || selectedMetric;
+    const targetD = dimension || selectedDimension;
+    if (!schema || !targetM) return;
+
+    setLoading(true);
+    try {
+      const res = await window.electron.runDiagnosticInvestigation(
+        schema.tableName,
+        targetM,
+        targetD,
+        question || userQuestion
+      );
+      if (res.success && res.report) {
+        setReport(res.report);
+      }
+    } catch (err) {
+      console.error('Diagnostic investigation failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 1. Fetch available target metrics and dimensions
   useEffect(() => {
     async function loadTargets() {
@@ -49,33 +76,6 @@ export default function DiagnosticAgentPanel() {
     const targetObj = targets.find(t => t.metric === metric);
     if (targetObj && targetObj.dimensions.length > 0) {
       setSelectedDimension(targetObj.dimensions[0]);
-    }
-  };
-
-  const runInvestigation = async (
-    metric?: string,
-    dimension?: string,
-    question?: string
-  ) => {
-    const targetM = metric || selectedMetric;
-    const targetD = dimension || selectedDimension;
-    if (!schema || !targetM) return;
-
-    setLoading(true);
-    try {
-      const res = await window.electron.runDiagnosticInvestigation(
-        schema.tableName,
-        targetM,
-        targetD,
-        question || userQuestion
-      );
-      if (res.success && res.report) {
-        setReport(res.report);
-      }
-    } catch (err) {
-      console.error('Diagnostic investigation failed:', err);
-    } finally {
-      setLoading(false);
     }
   };
 

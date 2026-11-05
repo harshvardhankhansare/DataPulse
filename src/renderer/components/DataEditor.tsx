@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import OutlierReviewPanel, { OutlierItem } from './OutlierReviewPanel';
 
 export default function DataEditor() {
   const schema = useAppStore(s => s.schema);
@@ -16,12 +17,18 @@ export default function DataEditor() {
   const [canUndo, setCanUndo] = useState(false);
   const [snapshotCount, setSnapshotCount] = useState(0);
 
+  // Outlier detection state
+  const [outliers, setOutliers] = useState<OutlierItem[]>([]);
+  const [showOutlierPanel, setShowOutlierPanel] = useState<boolean>(false);
+  const [detectingOutliers, setDetectingOutliers] = useState<boolean>(false);
+
   // Cell editing state
   const [editingCell, setEditingCell] = useState<{ rowid: number; column: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
   const loadData = useCallback(async () => {
     if (!schema?.tableName) return;
+    await Promise.resolve();
     setLoading(true);
     try {
       const res = await window.electron.getTableRows(
@@ -46,10 +53,11 @@ export default function DataEditor() {
     } finally {
       setLoading(false);
     }
-  }, [schema?.tableName, page, pageSize, search, schema?.columns]);
+  }, [schema, page, pageSize, search]);
 
   useEffect(() => {
-    loadData();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData();
   }, [loadData]);
 
   // Handle cell double click
@@ -168,7 +176,7 @@ export default function DataEditor() {
       setCanUndo(false);
       setSnapshotCount(0);
     }
-  }, [schema?.tableName]);
+  }, [schema]);
 
   // Undo last destructive operation
   const handleUndo = async () => {
@@ -228,6 +236,71 @@ export default function DataEditor() {
     });
   }, [schema?.tableName, rows.length, totalCount]);
 
+  const handleDetectOutliers = async () => {
+    if (!schema?.tableName) return;
+    setDetectingOutliers(true);
+    setStatusMessage({ text: 'Scanning numeric columns for IQR outliers...', type: 'info' });
+    try {
+      const res = await window.electron.detectOutliers(schema.tableName);
+      if (res.success && res.outliers) {
+        setOutliers(res.outliers);
+        setShowOutlierPanel(true);
+        if (res.outliers.length === 0) {
+          setStatusMessage({ text: '🎉 No outliers detected in any numeric column!', type: 'success' });
+        } else {
+          setStatusMessage({ text: `Found ${res.outliers.length} outlier(s). Review them in the panel below.`, type: 'info' });
+        }
+      } else {
+        setStatusMessage({ text: `Failed detecting outliers: ${res.error}`, type: 'error' });
+      }
+    } catch (err) {
+      console.error('Outlier detection failed:', err);
+      setStatusMessage({ text: 'Outlier detection failed.', type: 'error' });
+    } finally {
+      setDetectingOutliers(false);
+    }
+  };
+
+  const handleAcceptOutlier = async (item: OutlierItem) => {
+    if (!schema?.tableName) return;
+    try {
+      const res = await window.electron.updateCell(schema.tableName, item.rowid, item.column, item.suggestedValue);
+      if (res.success) {
+        setOutliers(prev => prev.filter(o => !(o.rowid === item.rowid && o.column === item.column)));
+        setStatusMessage({ text: `Updated ${item.column} (Row #${item.rowid}) to ${item.suggestedValue}`, type: 'success' });
+        void loadData();
+        bumpDataVersion();
+        refreshUndoStatus();
+      }
+    } catch (err) {
+      console.error('Failed to update outlier cell:', err);
+    }
+  };
+
+  const handleSkipOutlier = (item: OutlierItem) => {
+    setOutliers(prev => prev.filter(o => !(o.rowid === item.rowid && o.column === item.column)));
+  };
+
+  const handleAcceptAllOutliers = async (colFilter?: string) => {
+    if (!schema?.tableName) return;
+    const itemsToAccept = colFilter ? outliers.filter(o => o.column === colFilter) : [...outliers];
+    if (itemsToAccept.length === 0) return;
+
+    setStatusMessage({ text: `Replacing ${itemsToAccept.length} outlier(s)...`, type: 'info' });
+    for (const item of itemsToAccept) {
+      await window.electron.updateCell(schema.tableName, item.rowid, item.column, item.suggestedValue);
+    }
+    setOutliers(prev => prev.filter(o => colFilter ? o.column !== colFilter : false));
+    setStatusMessage({ text: `Successfully updated ${itemsToAccept.length} outlier value(s)!`, type: 'success' });
+    void loadData();
+    bumpDataVersion();
+    refreshUndoStatus();
+  };
+
+  const handleSkipAllOutliers = (colFilter?: string) => {
+    setOutliers(prev => prev.filter(o => colFilter ? o.column !== colFilter : false));
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
   return (
     <div className="dp-card" style={{ marginTop: 0, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -262,6 +335,16 @@ export default function DataEditor() {
 
         {/* Right: 1-Click Cleaners & Export */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="dp-btn dp-btn-ghost"
+            style={{ padding: '6px 11px', fontSize: 11, border: '1px solid #1e293b' }}
+            onClick={handleDetectOutliers}
+            disabled={detectingOutliers}
+            title="Scan numeric columns using IQR (Q1 - 3*IQR, Q3 + 3*IQR) to detect extreme outliers"
+          >
+            {detectingOutliers ? '⏳ Scanning...' : '🔍 Detect Outliers'}
+          </button>
+
           <button
             className="dp-btn dp-btn-ghost"
             style={{ padding: '6px 11px', fontSize: 11, border: '1px solid #1e293b' }}
@@ -546,6 +629,17 @@ export default function DataEditor() {
           </button>
         </div>
       </div>
+
+      {showOutlierPanel && outliers.length > 0 && (
+        <OutlierReviewPanel
+          outliers={outliers}
+          onAccept={handleAcceptOutlier}
+          onSkip={handleSkipOutlier}
+          onAcceptAll={handleAcceptAllOutliers}
+          onSkipAll={handleSkipAllOutliers}
+          onClose={() => setShowOutlierPanel(false)}
+        />
+      )}
     </div>
   );
 }

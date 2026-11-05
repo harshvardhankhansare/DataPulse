@@ -24,9 +24,9 @@ export const useToast = () => {
     return context;
 };
 
-interface ToastProviderProps {
+type ToastProviderProps = {
     children: ReactNode;
-}
+};
 
 export const ToastProvider = ({ children }: ToastProviderProps) => {
     const [toasts, setToasts] = useState<Toast[]>([]);

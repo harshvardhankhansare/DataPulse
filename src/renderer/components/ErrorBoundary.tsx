@@ -1,9 +1,9 @@
 import React, { Component, ReactNode } from 'react';
 
-interface ErrorBoundaryProps {
+type ErrorBoundaryProps = {
     children: ReactNode;
     fallback: ReactNode;
-}
+};
 
 interface ErrorBoundaryState {
     hasError: boolean;

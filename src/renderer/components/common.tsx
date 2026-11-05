@@ -14,7 +14,9 @@ export function AiStatusDot() {
                 const s = await window.electron.checkAiStatus();
                 setOnline(s.available);
                 setModel(s.modelName || '');
-            } catch { }
+            } catch {
+                /* offline fallback */
+            }
         };
         check();
         const id = setInterval(check, 20000);

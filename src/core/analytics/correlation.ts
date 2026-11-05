@@ -2,7 +2,7 @@ import { TableSchema } from '../schema/schemaTypes.js';
 import { ActiveFilter } from './filterTypes.js';
 import { getPrioritizedNumericColumns } from '../schema/typeDetector.js';
 
-type QueryFunction = (sql: string) => Promise<any[]>;
+type QueryFunction = (sql: string) => Promise<unknown[]>;
 
 export interface ScatterPoint {
   x: number;
@@ -60,7 +60,7 @@ export async function runCorrelation(
           FROM ${tableName}
           WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
             ${filterClause}
-        `);
+        `) as { corr_coef: number }[];
         const corr = Number(corrRows[0]?.corr_coef ?? 0);
         pairCorrelations.push({ col1, col2, corr });
       } catch { /* skip bad pair */ }
@@ -84,7 +84,7 @@ export async function runCorrelation(
         WHERE ${esc1} IS NOT NULL AND ${esc2} IS NOT NULL
           ${filterClause}
         LIMIT 200
-      `);
+      `) as { x: number; y: number }[];
       results.push({
         column1: pair.col1,
         column2: pair.col2,

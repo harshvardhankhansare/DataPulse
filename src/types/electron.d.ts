@@ -45,6 +45,8 @@ export interface ElectronAPI {
     rows?: any[];
     chartConfig?: ChartConfig | null;
     error?: string;
+    heuristic?: boolean;
+    heuristicExplanation?: string;
   }>;
   getSimulationConfig: (tableName: string) => Promise<{
     success: boolean;
@@ -180,6 +182,19 @@ export interface ElectronAPI {
     success: boolean;
     canUndo: boolean;
     snapshotCount: number;
+    error?: string;
+  }>;
+  detectOutliers: (tableName: string) => Promise<{
+    success: boolean;
+    outliers?: {
+      rowid: number;
+      column: string;
+      originalValue: number;
+      suggestedValue: number;
+      replacementType: 'median' | 'mean';
+      lowerBound: number;
+      upperBound: number;
+    }[];
     error?: string;
   }>;
 }

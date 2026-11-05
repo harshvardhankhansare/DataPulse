@@ -6,6 +6,26 @@ export interface AiServerStatus {
   error?: string;
 }
 
+interface OpenAiModelsResponse {
+  data: Array<{ id: string }>;
+}
+
+interface OllamaTagsResponse {
+  models: Array<{ name: string }>;
+}
+
+interface OpenAiChatResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    }
+  }>;
+}
+
+interface OllamaGenerateResponse {
+  response: string;
+}
+
 export class LocalAiClient {
   private defaultLmStudioUrl = 'http://127.0.0.1:1234/v1';
   private defaultOllamaUrl = 'http://127.0.0.1:11434';
@@ -39,10 +59,10 @@ export class LocalAiClient {
         });
 
         if (response.ok) {
-          const data: any = await response.json();
+          const data = await response.json();
           // Verify that data is OpenAI models structure: { data: [ { id: "..." } ] }
-          if (Array.isArray(data?.data) && data.data.length > 0) {
-            const modelName = data.data[0]?.id || 'Local LLM';
+          if (Array.isArray((data as OpenAiModelsResponse)?.data) && (data as OpenAiModelsResponse).data.length > 0) {
+            const modelName = (data as OpenAiModelsResponse).data[0]?.id || 'Local LLM';
             return {
               available: true,
               provider: 'lmstudio',
@@ -65,9 +85,9 @@ export class LocalAiClient {
         });
 
         if (response.ok) {
-          const data: any = await response.json();
-          if (Array.isArray(data?.models) && data.models.length > 0) {
-            const modelName = data.models[0]?.name || 'Ollama Model';
+          const data = await response.json();
+          if (Array.isArray((data as OllamaTagsResponse)?.models) && (data as OllamaTagsResponse).models.length > 0) {
+            const modelName = (data as OllamaTagsResponse).models[0]?.name || 'Ollama Model';
             return {
               available: true,
               provider: 'ollama',
@@ -116,8 +136,8 @@ export class LocalAiClient {
         throw new Error(`LM Studio HTTP error (${response.status}): ${errText || response.statusText}`);
       }
 
-      const data: any = await response.json();
-      return data.choices?.[0]?.message?.content || '';
+      const data = await response.json();
+      return (data as OpenAiChatResponse).choices?.[0]?.message?.content || '';
     } else {
       // Ollama
       const response = await fetch(`${status.endpoint}/api/generate`, {
@@ -137,8 +157,8 @@ export class LocalAiClient {
         throw new Error(`Ollama HTTP error (${response.status}): ${errText || response.statusText}`);
       }
 
-      const data: any = await response.json();
-      return data.response || '';
+      const data = await response.json();
+      return (data as OllamaGenerateResponse).response || '';
     }
   }
 }

@@ -115,7 +115,8 @@ export async function importXlsx(
     }
   } catch (error) {
     throw new Error(
-      `Failed to import Excel spreadsheet from ${filePath}: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to import Excel spreadsheet from ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 }

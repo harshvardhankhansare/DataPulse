@@ -7,12 +7,12 @@ import {
   JoinViewResult,
 } from '@core/lakehouse/lakehouseTypes';
 
-interface SmartJoinModalProps {
+type SmartJoinModalProps = {
   tables: LakehouseTable[];
   candidates: JoinCandidate[];
   onCancel: () => void;
   onJoinComplete: (result: JoinViewResult, blendName: string) => void;
-}
+};
 
 export default function SmartJoinModal({
   tables,

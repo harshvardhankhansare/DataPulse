@@ -439,7 +439,7 @@ export default function SimulationPanel() {
 
               // Relationship pill
               const corr = driver.correlation;
-              let badgeText = '';
+              let badgeText: string;
               let badgeColor = '#94a3b8';
               let badgeBg = 'rgba(148, 163, 184, 0.15)';
 
@@ -471,7 +471,7 @@ export default function SimulationPanel() {
               }
 
               // Dynamic impact explanation string
-              let impactDisplay = '';
+              let impactDisplay: string;
               if (val === 0) {
                 impactDisplay = 'Baseline (0% shift)';
               } else if (isRate) {

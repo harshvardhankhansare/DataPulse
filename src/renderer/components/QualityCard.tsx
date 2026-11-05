@@ -1,6 +1,6 @@
 import { QualityReport, QualityIssue } from '@core/profiler/profilerTypes';
 
-interface QualityCardProps { quality: QualityReport; }
+type QualityCardProps = { quality: QualityReport; };
 
 /* SVG Donut score */
 function DonutScore({ score }: { score: number }) {

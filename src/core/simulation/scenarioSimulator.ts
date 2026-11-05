@@ -63,14 +63,14 @@ export async function detectSimulationConfig(
 
       // Check if this is a binary outcome (0 and 1) like LeaveOrNot, Churn, Default, Status
       const isBinary = (minV === 0 && maxV === 1 && col.distinctCount <= 2) ||
-                       /leave|churn|attrition|default|converted|survive|success|fraud|status/i.test(lower);
+        /leave|churn|attrition|default|converted|survive|success|fraud|status/i.test(lower);
 
       if (isBinary) {
-        let label = col.name.replace(/_/g, ' ');
+        let label: string;
         if (/leave/i.test(lower)) label = 'Employee Attrition Rate (%)';
         else if (/churn/i.test(lower)) label = 'Customer Churn Rate (%)';
         else if (/default/i.test(lower)) label = 'Loan Default Rate (%)';
-        else label = `${col.name} Rate (%)`;
+        else label = `${col.name.replace(/_/g, ' ')} Rate (%)`;
 
         candidateCols.push({
           name: col.name,
@@ -152,18 +152,18 @@ export async function detectSimulationConfig(
     description: c.kind === 'rate'
       ? 'Calculates percentage probability of positive outcome'
       : c.kind === 'average'
-      ? 'Calculates expected average value'
-      : 'Calculates projected total volume and average',
+        ? 'Calculates expected average value'
+        : 'Calculates projected total volume and average',
   }));
 
   // Pick up to 5 drivers (strictly numeric columns other than the target, excluding IDs and Years)
   let driverCandidates = schema.columns.filter(c => {
     const l = c.name.toLowerCase().trim();
     return c.name !== targetColumn &&
-           !EXCLUDE_PATTERN.test(l) &&
-           c.detectedType !== ColumnType.IDENTIFIER &&
-           c.detectedType !== ColumnType.DATE &&
-           c.detectedType === ColumnType.NUMERIC;
+      !EXCLUDE_PATTERN.test(l) &&
+      c.detectedType !== ColumnType.IDENTIFIER &&
+      c.detectedType !== ColumnType.DATE &&
+      c.detectedType === ColumnType.NUMERIC;
   }).slice(0, 5);
 
   if (driverCandidates.length === 0) {
@@ -297,7 +297,7 @@ export async function runSimulation(
   const totalRows = Number(sRow.total_rows || 1);
 
   const isBinaryRate = (minV === 0 && maxV === 1 && distinctV <= 2) ||
-                       /leave|churn|attrition|default|converted|survive|status/i.test(targetLower);
+    /leave|churn|attrition|default|converted|survive|status/i.test(targetLower);
 
   let targetKind: MetricKind = 'total';
   let targetLabel = targetCol.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -321,8 +321,8 @@ export async function runSimulation(
   }
 
   // 1. Fetch baseline numbers
-  let baselineValue = 0;
-  let baselineSecondaryText = '';
+  let baselineValue: number;
+  let baselineSecondaryText: string;
 
   if (targetKind === 'rate') {
     baselineValue = Number((avgVal * 100).toFixed(2));
@@ -346,8 +346,8 @@ export async function runSimulation(
     const percentAdj = adjustments[driverName] || 0;
     const driverEsc = `TRY_CAST("${driverName.replace(/"/g, '""')}" AS DOUBLE)`;
 
-    let slope = 0;
-    let corr = 0;
+    let slope: number;
+    let corr: number;
     let sumX = 0;
     let avgX = 0;
 
@@ -371,7 +371,7 @@ export async function runSimulation(
       corr = 0;
     }
 
-    let individualDelta = 0;
+    let individualDelta: number;
     if (targetKind === 'rate') {
       // Delta in percentage points: slope * delta_x_avg * 100
       const deltaXAvg = avgX * (percentAdj / 100);
@@ -398,7 +398,7 @@ export async function runSimulation(
     });
 
     // Sensitivity (+10% standard shift)
-    let impactPerTenPercent = 0;
+    let impactPerTenPercent: number;
     if (targetKind === 'rate') {
       impactPerTenPercent = Number((slope * (0.10 * avgX) * 100).toFixed(2));
     } else if (targetKind === 'average') {
@@ -409,7 +409,7 @@ export async function runSimulation(
 
     const percentageImpact = baselineValue > 0 ? Number(((impactPerTenPercent / baselineValue) * 100).toFixed(2)) : 0;
 
-    let explanation = '';
+    let explanation: string;
     if (targetKind === 'rate') {
       if (impactPerTenPercent < 0) {
         explanation = `+10% shift reduces turnover by ${Math.abs(impactPerTenPercent)}%-pts (Keeps employees)`;
@@ -454,11 +454,11 @@ export async function runSimulation(
   });
 
   // Calculate projected outcome
-  let projectedValue = 0;
-  let deltaValue = 0;
-  let percentChange = 0;
-  let projectedSecondaryText = '';
-  let deltaSecondaryText = '';
+  let projectedValue: number;
+  let deltaValue: number;
+  let percentChange: number;
+  let projectedSecondaryText: string;
+  let deltaSecondaryText: string;
 
   if (targetKind === 'rate') {
     projectedValue = Number(Math.min(100, Math.max(0, baselineValue + totalDelta)).toFixed(2));
@@ -493,7 +493,7 @@ export async function runSimulation(
   }
 
   // Generate plain English narrative summary
-  let summaryText = '';
+  let summaryText: string;
   if (Math.abs(deltaValue) < 0.01) {
     summaryText = `Control levers are at baseline. Move any slider on the left to simulate operational decisions on ${targetLabel}.`;
   } else if (targetKind === 'rate') {
@@ -507,7 +507,7 @@ export async function runSimulation(
   }
 
   // Best recommendation
-  let recommendationText = '';
+  let recommendationText: string;
   if (targetKind === 'rate') {
     // For Attrition, the best lever is the one with the most negative slope/impact (reduces turnover)
     const bestRetainer = [...sensitivities].sort((a, b) => a.impactPerTenPercent - b.impactPerTenPercent)[0];

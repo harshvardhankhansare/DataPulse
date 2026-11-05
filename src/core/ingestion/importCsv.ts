@@ -13,6 +13,6 @@ export async function importCsv(
     const sql = `CREATE TABLE ${tableName} AS SELECT * FROM read_csv_auto('${normalizedPath}')`;
     await queryFn(sql);
   } catch (error) {
-    throw new Error(`Failed to import CSV from ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Failed to import CSV from ${filePath}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
 }
