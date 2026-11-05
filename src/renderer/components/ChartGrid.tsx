@@ -2,12 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import * as echarts from 'echarts';
 import { ChartConfig, ChartType, ChartDataPoint } from '../../core/charts/chartTypes';
 import { ActiveFilter } from '../../core/analytics/filterTypes';
-
-interface ChartGridProps {
-  charts: ChartConfig[];
-  onFilterSelect?: (filter: ActiveFilter) => void;
-  activeFilter?: ActiveFilter | null;
-}
+import { useAppStore } from '../store/useAppStore';
 
 const COLOR_PALETTE = [
   '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899',
@@ -58,6 +53,7 @@ export function ChartCard({
   const [activeType, setActiveType] = useState<ChartType>(config.chartType);
   const [sortOrder, setSortOrder] = useState<SortOrder>('default');
   const [metricScenario, setMetricScenario] = useState<MetricScenario>('avg');
+  const [selectedDataPoint, setSelectedDataPoint] = useState<ChartDataPoint | null>(null);
 
   // Has sum/total value scenario
   const hasMultipleMetrics = Boolean(config.data && config.data.some(d => d.value2 !== undefined));
@@ -580,11 +576,11 @@ export function ChartCard({
             },
             areaStyle: isArea
               ? {
-                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(59, 130, 246, 0.45)' },
-                    { offset: 1, color: 'rgba(59, 130, 246, 0.02)' },
-                  ]),
-                }
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  { offset: 0, color: 'rgba(59, 130, 246, 0.45)' },
+                  { offset: 1, color: 'rgba(59, 130, 246, 0.02)' },
+                ]),
+              }
               : undefined,
           },
         ],
@@ -672,9 +668,16 @@ export function ChartCard({
     chart.setOption(option, true);
 
     const handleClick = (params: any) => {
-      if (params && params.name && onFilterSelect) {
-        const col = config.xAxisLabel || config.sourceColumns[0];
-        onFilterSelect({ column: col, value: params.name });
+      if (params && params.name) {
+        // Find the corresponding data point
+        const clickedDataPoint = processedData.find(d => d.label === params.name);
+        if (clickedDataPoint) {
+          setSelectedDataPoint(clickedDataPoint);
+        }
+        if (onFilterSelect) {
+          const col = config.xAxisLabel || config.sourceColumns[0];
+          onFilterSelect({ column: col, value: params.name });
+        }
       }
     };
     chart.off('click');
@@ -937,6 +940,58 @@ export function ChartCard({
         </div>
       )}
 
+      {/* Selected Data Point Detail View */}
+      {selectedDataPoint && (
+        <div style={{
+          background: '#161b2a',
+          borderRadius: 8,
+          padding: '12px 16px',
+          margin: '8px 0',
+          border: '1px solid #222b42',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 700 }}>Selected Item</div>
+              <div style={{ fontWeight: 800, color: '#f1f5f9', fontSize: 16, fontFamily: 'monospace' }}>
+                {selectedDataPoint.label}
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedDataPoint(null)}
+              style={{
+                background: 'transparent',
+                border: '1px solid #3b82f6',
+                color: '#60a5fa',
+                borderRadius: 4,
+                padding: '4px 8px',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s',
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <div>
+              <div style={{ color: '#94a3b8', fontSize: 10, fontWeight: 600 }}>Value</div>
+              <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: 18, fontFamily: 'monospace' }}>
+                {Number(selectedDataPoint.value).toLocaleString()}
+              </div>
+            </div>
+            {selectedDataPoint.value2 !== undefined && (
+              <div>
+                <div style={{ color: '#94a3b8', fontSize: 10, fontWeight: 600 }}>Secondary Value</div>
+                <div style={{ fontWeight: 800, color: '#a78bfa', fontSize: 18, fontFamily: 'monospace' }}>
+                  {Number(selectedDataPoint.value2).toLocaleString()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Summary Panel for Descriptive Stats */}
       {config.statsSummary && (
         <div style={{
@@ -1067,7 +1122,11 @@ function ChartThumbnail({ config, onClick, isSelected }: { config: ChartConfig; 
 }
 
 /** Full Chart Grid view with Master-Detail split layout */
-export default function ChartGrid({ charts, onFilterSelect, activeFilter }: ChartGridProps) {
+export default function ChartGrid() {
+  const charts = useAppStore(s => s.charts);
+  const toggleFilter = useAppStore(s => s.toggleFilter);
+  const activeFilter = useAppStore(s => s.activeFilter);
+
   // ALL hooks must be called before any early return — React rules of hooks
   const [filterType, setFilterType] = useState<string>('all');
   const [selectedChart, setSelectedChart] = useState<ChartConfig | null>(null);
@@ -1205,7 +1264,7 @@ export default function ChartGrid({ charts, onFilterSelect, activeFilter }: Char
           <ChartCard
             key={`${activeChart.analysisType}-${activeChart.title}`}
             config={activeChart}
-            onFilterSelect={onFilterSelect}
+            onFilterSelect={toggleFilter}
             activeFilter={activeFilter}
           />
         ) : (

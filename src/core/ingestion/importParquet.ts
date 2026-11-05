@@ -11,6 +11,8 @@ export async function importParquet(
     const sql = `CREATE TABLE ${tableName} AS SELECT * FROM read_parquet('${normalizedPath}')`;
     await queryFn(sql);
   } catch (error) {
-    throw new Error(`Failed to import Parquet from ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    const err = new Error(`Failed to import Parquet from ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    (err as any).cause = error;
+    throw err;
   }
 }

@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
-import { TableSchema } from '@core/schema/schemaTypes';
-import { ActiveFilter } from '@core/analytics/filterTypes';
 import { SimulationConfig, SimulationResult } from '@core/simulation/scenarioTypes';
+import { useAppStore } from '../store/useAppStore';
 
-interface SimulationPanelProps {
-  schema: TableSchema;
-  activeFilter?: ActiveFilter | null;
-}
-
-export default function SimulationPanel({ schema, activeFilter }: SimulationPanelProps) {
+export default function SimulationPanel() {
+  const schema = useAppStore(s => s.schema);
+  const activeFilter = useAppStore(s => s.activeFilter);
   const [config, setConfig] = useState<SimulationConfig | null>(null);
   const [targetCol, setTargetCol] = useState<string>('');
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
@@ -22,7 +18,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
   // 1. Fetch simulation configuration
   useEffect(() => {
     async function loadConfig() {
-      if (!window.electron?.getSimulationConfig) return;
+      if (!schema || !window.electron?.getSimulationConfig) return;
       try {
         setLoading(true);
         const res = await window.electron.getSimulationConfig(schema.tableName);
@@ -42,12 +38,12 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
       }
     }
     loadConfig();
-  }, [schema.tableName]);
+  }, [schema?.tableName]);
 
   // 2. Run simulation on target or adjustment changes
   useEffect(() => {
     async function executeSimulation() {
-      if (!targetCol || !window.electron?.runSimulation) return;
+      if (!schema || !targetCol || !window.electron?.runSimulation) return;
       try {
         const res = await window.electron.runSimulation(
           schema.tableName,
@@ -63,7 +59,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
       }
     }
     executeSimulation();
-  }, [schema.tableName, targetCol, adjustments, activeFilter]);
+  }, [schema?.tableName, targetCol, adjustments, activeFilter]);
 
   // 3. Render Comparison Chart
   useEffect(() => {
@@ -443,7 +439,7 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
 
               // Relationship pill
               const corr = driver.correlation;
-              let badgeText = '';
+              let badgeText: string;
               let badgeColor = '#94a3b8';
               let badgeBg = 'rgba(148, 163, 184, 0.15)';
 
@@ -475,15 +471,15 @@ export default function SimulationPanel({ schema, activeFilter }: SimulationPane
               }
 
               // Dynamic impact explanation string
-              let impactDisplay = '';
+              let impactDisplay: string;
               if (val === 0) {
                 impactDisplay = 'Baseline (0% shift)';
               } else if (isRate) {
                 impactDisplay = indDelta < 0
                   ? `Reduces turnover by ${Math.abs(indDelta)}%-pts`
                   : indDelta > 0
-                  ? `Increases turnover by +${indDelta}%-pts`
-                  : 'Minimal effect';
+                    ? `Increases turnover by +${indDelta}%-pts`
+                    : 'Minimal effect';
               } else {
                 impactDisplay = `${indDelta >= 0 ? '+' : ''}${indDelta.toLocaleString()} on ${simResult?.targetLabel || 'target'}`;
               }

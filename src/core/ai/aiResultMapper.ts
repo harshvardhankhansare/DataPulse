@@ -2,7 +2,7 @@ import { ChartConfig } from '../charts/chartTypes.js';
 
 export function mapAiResultToChart(
   question: string,
-  rows: Record<string, any>[]
+  rows: Record<string, unknown>[]
 ): ChartConfig | null {
   if (!rows || rows.length === 0 || rows.length > 50) return null;
 
@@ -20,8 +20,8 @@ export function mapAiResultToChart(
 
   return {
     chartType: isDate ? 'line' : 'bar',
-    availableTypes: isDate 
-      ? ['line', 'area', 'bar'] 
+    availableTypes: isDate
+      ? ['line', 'area', 'bar']
       : ['bar', 'horizontal_bar', 'donut', 'pie', 'funnel', 'radar'],
     title: question,
     xAxisLabel: labelKey,

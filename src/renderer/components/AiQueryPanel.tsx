@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
 import { ChartConfig } from '@core/charts/chartTypes';
 import { ChartCard } from './ChartGrid';
-
-interface AiQueryPanelProps {
-  schema: TableSchema;
-}
+import { useAppStore } from '../store/useAppStore';
+import { useToast } from './Toast';
 
 interface AiServerState {
   available: boolean;
@@ -15,7 +12,8 @@ interface AiServerState {
   error?: string;
 }
 
-export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
+export default function AiQueryPanel() {
+  const schema = useAppStore(s => s.schema);
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState('http://127.0.0.1:1234/v1');
@@ -25,12 +23,15 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
     provider: 'none',
     endpoint: 'http://127.0.0.1:1234/v1',
   });
+  const { addToast } = useToast();
 
   const [queryResult, setQueryResult] = useState<{
     sql?: string;
     rows?: Record<string, any>[];
     chartConfig?: ChartConfig | null;
     error?: string;
+    heuristic?: boolean;
+    heuristicExplanation?: string;
   } | null>(null);
 
   const checkConnection = async (url?: string) => {
@@ -39,16 +40,19 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
       const status = await window.electron.checkAiStatus(url || customEndpoint);
       setServerState(status);
     } catch {
-      setServerState({
+      const errorState = {
         available: false,
         provider: 'none',
         endpoint: url || customEndpoint,
         error: 'Failed to connect to local AI server.',
-      });
+      };
+      setServerState(errorState);
+      addToast('Failed to connect to local AI server.', 'error');
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkConnection();
     const interval = setInterval(() => checkConnection(), 15000);
     return () => clearInterval(interval);
@@ -56,7 +60,7 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
 
   const handleAsk = async (promptText?: string) => {
     const q = promptText || question;
-    if (!q.trim() || loading) return;
+    if (!schema || !q.trim() || loading) return;
 
     setLoading(true);
     setQueryResult(null);
@@ -68,6 +72,8 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
           sql: res.sql,
           rows: res.rows,
           chartConfig: res.chartConfig,
+          heuristic: res.heuristic,
+          heuristicExplanation: res.heuristicExplanation,
         });
       } else {
         setQueryResult({
@@ -85,8 +91,8 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
   };
 
   // Generate dynamic suggestion chips based on table columns
-  const numericCols = schema.columns.filter(c => c.detectedType === 'numeric');
-  const catCols = schema.columns.filter(c => c.detectedType === 'categorical');
+  const numericCols = schema?.columns.filter(c => c.detectedType === 'numeric') ?? [];
+  const catCols = schema?.columns.filter(c => c.detectedType === 'categorical') ?? [];
   const suggestions: string[] = [];
 
   if (numericCols.length > 0 && catCols.length > 0) {
@@ -96,7 +102,7 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
   if (numericCols.length >= 2) {
     suggestions.push(`Compare ${numericCols[0].name} vs ${numericCols[1].name}`);
   }
-  if (suggestions.length === 0 && schema.columns.length > 0) {
+  if (suggestions.length === 0 && schema && schema.columns.length > 0) {
     suggestions.push(`Count rows grouped by ${schema.columns[0].name}`);
   }
 
@@ -428,9 +434,22 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
                 marginBottom: '6px',
               }}>
                 <span style={{ fontWeight: 600, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>⚡</span> Generated DuckDB SQL:
+                  {queryResult.heuristic ? (
+                    <>
+                      <span>🧠</span> Heuristic Query:
+                      {queryResult.heuristicExplanation && (
+                        <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>
+                          ({queryResult.heuristicExplanation})
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span>⚡</span> Generated DuckDB SQL:
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Validated & Executed In-Memory</span>
+                    </>
+                  )}
                 </span>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>Validated & Executed In-Memory</span>
               </div>
               <div style={{
                 background: '#080c14',
@@ -438,7 +457,7 @@ export default function AiQueryPanel({ schema }: AiQueryPanelProps) {
                 padding: '12px 16px',
                 fontSize: '12px',
                 fontFamily: 'var(--font-mono)',
-                color: '#34d399',
+                color: queryResult.heuristic ? '#fbbf24' : '#34d399',
                 border: '1px solid #1e2638',
                 overflowX: 'auto',
               }}>

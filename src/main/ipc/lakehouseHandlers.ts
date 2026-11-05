@@ -1,6 +1,5 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { importMultipleFiles, createJoinView } from '../../core/lakehouse/lakehouseEngine.js';
-import { detectJoinCandidates } from '../../core/lakehouse/relationalMatcher.js';
 import { JoinPlan } from '../../core/lakehouse/lakehouseTypes.js';
 
 export function registerLakehouseHandlers(query: (sql: string) => Promise<any[]>) {
@@ -9,7 +8,7 @@ export function registerLakehouseHandlers(query: (sql: string) => Promise<any[]>
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'xls', 'json', 'parquet'] },
+        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'json', 'parquet'] },
         { name: 'All files', extensions: ['*'] },
       ],
     });
@@ -23,16 +22,6 @@ export function registerLakehouseHandlers(query: (sql: string) => Promise<any[]>
       return { success: true, ...result };
     } catch (error) {
       console.error('lakehouse:import-files failed:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-
-  ipcMain.handle('lakehouse:detect-joins', async (_event, tables: any[]) => {
-    try {
-      const candidates = await detectJoinCandidates(tables, query);
-      return { success: true, candidates };
-    } catch (error) {
-      console.error('lakehouse:detect-joins failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });

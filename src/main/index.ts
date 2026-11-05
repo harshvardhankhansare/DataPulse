@@ -8,24 +8,61 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let splashWindow: BrowserWindow | null = null;
+
+function createSplashWindow() {
+  const splashPath = path.join(__dirname, 'splash.html');
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 340,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    show: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splashWindow.loadFile(splashPath).catch((err) => {
+    console.error('Failed to load splash screen:', err);
+  });
+}
 
 function createWindow() {
   const indexPath = path.join(__dirname, '../renderer/index.html');
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-  console.log(`Primary display size: ${screenWidth}x${screenHeight}`);
 
   mainWindow = new BrowserWindow({
-    width: 1024,
-    height: 720,
+    // ~80% of the work area, clamped to sensible bounds
+    width: Math.max(1024, Math.round(screenWidth * 0.8)),
+    height: Math.max(720, Math.round(screenHeight * 0.8)),
+    minWidth: 1024,
+    minHeight: 720,
     center: true,
-    show: true,
+    show: false, // shown on 'ready-to-show' after splash transition
     title: 'Offline Data Intelligence',
     webPreferences: {
       preload: path.join(__dirname, '../preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    // Hold splash screen briefly to show smooth startup progress animation
+    setTimeout(() => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+        splashWindow = null;
+      }
+      mainWindow?.show();
+      mainWindow?.focus();
+    }, 1600);
   });
 
   mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
@@ -36,23 +73,7 @@ function createWindow() {
     console.error('[Renderer Gone]', details);
   });
 
-  mainWindow.loadFile(indexPath).then(() => {
-    console.log('Renderer HTML loaded successfully');
-    console.log('Window bounds:', mainWindow?.getBounds());
-    console.log('Window isVisible:', mainWindow?.isVisible());
-    if (mainWindow) {
-      mainWindow.restore();
-      mainWindow.show();
-      mainWindow.setAlwaysOnTop(true);
-      mainWindow.focus();
-      app.focus({ steal: true });
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.setAlwaysOnTop(false);
-        }
-      }, 1500);
-    }
-  }).catch((err) => {
+  mainWindow.loadFile(indexPath).catch((err) => {
     console.error('Failed to load local HTML file:', err);
   });
 
@@ -63,6 +84,9 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   try {
+    // Display splash screen immediately
+    createSplashWindow();
+
     // Initialize DuckDB
     await initDuckDB();
 
@@ -71,6 +95,7 @@ app.whenReady().then(async () => {
 
     // Create the application window
     createWindow();
+
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {

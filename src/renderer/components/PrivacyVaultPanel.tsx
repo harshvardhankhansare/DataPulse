@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { TableSchema } from '@core/schema/schemaTypes';
 import {
   PrivacyAuditReport,
   AirGapStatus,
@@ -8,13 +7,12 @@ import {
   RiskLevel,
 } from '@core/privacy/privacyTypes';
 import { maskValueInJs } from '@core/privacy/piiMasker';
+import { useAppStore } from '../store/useAppStore';
+import { useToast } from '../components/Toast';
 
-interface PrivacyVaultPanelProps {
-  schema: TableSchema;
-  onPurgeDataset?: () => void;
-}
-
-export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVaultPanelProps) {
+export default function PrivacyVaultPanel() {
+  const schema = useAppStore(s => s.schema);
+  const resetData = useAppStore(s => s.resetData);
   const [report, setReport] = useState<PrivacyAuditReport | null>(null);
   const [airGap, setAirGap] = useState<AirGapStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,9 +21,11 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
   const [columnRules, setColumnRules] = useState<Record<string, { category: PiiCategory; strategy: MaskingStrategy }>>({});
   const [showConfirmPurge, setShowConfirmPurge] = useState(false);
   const [purgeSuccess, setPurgeSuccess] = useState<string | null>(null);
+  const { addToast } = useToast();
 
   // Load audit report and airgap status
   const loadPrivacyData = async () => {
+    if (!schema) return;
     setLoading(true);
     try {
       const [auditRes, airgapRes] = await Promise.all([
@@ -57,8 +57,9 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPrivacyData();
-  }, [schema.tableName]);
+  }, [schema?.tableName]);
 
   const handleStrategyChange = (column: string, category: PiiCategory, strategy: MaskingStrategy) => {
     setColumnRules(prev => ({
@@ -68,28 +69,34 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
   };
 
   const handleApplyMasking = async () => {
+    if (!schema) return;
     setActionLoading(true);
     try {
       const res = await window.electron.applyMasking(schema.tableName, columnRules);
       if (res.success) {
         setIsMasked(true);
+        addToast('1-Click Anonymization applied successfully!', 'success');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to apply masking:', err);
+      addToast('Failed to apply anonymization: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleRevertMasking = async () => {
+    if (!schema) return;
     setActionLoading(true);
     try {
       const res = await window.electron.revertMasking(schema.tableName);
       if (res.success) {
         setIsMasked(false);
+        addToast('Data reverted to raw view successfully!', 'success');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to revert masking:', err);
+      addToast('Failed to revert data: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -102,14 +109,16 @@ export default function PrivacyVaultPanel({ schema, onPurgeDataset }: PrivacyVau
       const res = await window.electron.purgeMemory();
       if (res.success) {
         setPurgeSuccess(`Zeroized all in-memory tables. Volatile RAM reclaimed.`);
-        if (onPurgeDataset) {
+        addToast('Memory zeroized successfully!', 'success');
+        {
           setTimeout(() => {
-            onPurgeDataset();
+            resetData();
           }, 1200);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Purge error:', err);
+      addToast('Purge failed: ' + err.message, 'error');
     } finally {
       setActionLoading(false);
     }

@@ -36,10 +36,12 @@
 ### 1. 📊 Interactive Data Table & 1-Click Cleaner
 * **Browse your actual data**: View all rows with instant search and pagination.
 * **Double-click to edit**: Fix typos or replace wrong numbers directly inside the grid.
+* **🔍 Outlier Review Panel**: Scans all numeric columns using the Interquartile Range (IQR) formula ($Q_1 - 3\text{IQR}$, $Q_3 + 3\text{IQR}$). Displays a bottom slide-in drawer showing original value, suggested replacement (Median/Mean), IQR bounds, and Accept/Skip controls.
 * **1-Click Cleaning Tools**:
   * 🧹 **Remove Duplicates**: Instantly scans your file and removes duplicate rows.
   * 🩹 **Fill Empty Cells**: Replaces missing numbers with zeros in one click.
   * ✂️ **Trim Extra Spaces**: Cleans up trailing and leading spaces from names and text.
+* **↩️ Multi-Level Undo**: Take snapshots before any cell edit or cleaning operation; undo changes anytime with 1-click.
 * **Export Cleaned CSV**: Download your cleaned, updated file with a single click.
 
 ### 2. 📈 Visual Charts & Key Patterns
@@ -71,7 +73,8 @@
 * Ask natural questions like:
   * *"Show me the top 5 customers by sales"*
   * *"Compare average order value across regions"*
-* Powered by optional local AI models (via Ollama or LM Studio) running entirely offline on your own machine.
+* Powered by local AI models (via Ollama or LM Studio) or built-in **Heuristic Rule-Based NL→SQL Fallback** when LLM servers are offline.
+
 
 ---
 

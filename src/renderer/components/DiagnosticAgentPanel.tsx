@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
-import { TableSchema } from '@core/schema/schemaTypes';
 import {
   DiagnosticReport,
   DiagnosticTargetOption,
 } from '@core/diagnostic/diagnosticTypes';
+import { useAppStore } from '../store/useAppStore';
 
-interface DiagnosticAgentPanelProps {
-  schema: TableSchema;
-}
-
-export default function DiagnosticAgentPanel({ schema }: DiagnosticAgentPanelProps) {
+export default function DiagnosticAgentPanel() {
+  const schema = useAppStore(s => s.schema);
   const [targets, setTargets] = useState<DiagnosticTargetOption[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<string>('');
   const [selectedDimension, setSelectedDimension] = useState<string>('');
@@ -23,10 +20,37 @@ export default function DiagnosticAgentPanel({ schema }: DiagnosticAgentPanelPro
   const chartRef = useRef<HTMLDivElement>(null);
   const echartsRef = useRef<echarts.ECharts | null>(null);
 
+  const runInvestigation = async (
+    metric?: string,
+    dimension?: string,
+    question?: string
+  ) => {
+    const targetM = metric || selectedMetric;
+    const targetD = dimension || selectedDimension;
+    if (!schema || !targetM) return;
+
+    setLoading(true);
+    try {
+      const res = await window.electron.runDiagnosticInvestigation(
+        schema.tableName,
+        targetM,
+        targetD,
+        question || userQuestion
+      );
+      if (res.success && res.report) {
+        setReport(res.report);
+      }
+    } catch (err) {
+      console.error('Diagnostic investigation failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 1. Fetch available target metrics and dimensions
   useEffect(() => {
     async function loadTargets() {
-      if (!window.electron?.getDiagnosticTargets) return;
+      if (!schema || !window.electron?.getDiagnosticTargets) return;
       try {
         const res = await window.electron.getDiagnosticTargets(schema.tableName);
         if (res.success && res.targets && res.targets.length > 0) {
@@ -44,7 +68,7 @@ export default function DiagnosticAgentPanel({ schema }: DiagnosticAgentPanelPro
       }
     }
     loadTargets();
-  }, [schema.tableName]);
+  }, [schema?.tableName]);
 
   // When selected metric changes, update available dimensions
   const handleMetricChange = (metric: string) => {
@@ -52,33 +76,6 @@ export default function DiagnosticAgentPanel({ schema }: DiagnosticAgentPanelPro
     const targetObj = targets.find(t => t.metric === metric);
     if (targetObj && targetObj.dimensions.length > 0) {
       setSelectedDimension(targetObj.dimensions[0]);
-    }
-  };
-
-  const runInvestigation = async (
-    metric?: string,
-    dimension?: string,
-    question?: string
-  ) => {
-    const targetM = metric || selectedMetric;
-    const targetD = dimension || selectedDimension;
-    if (!targetM) return;
-
-    setLoading(true);
-    try {
-      const res = await window.electron.runDiagnosticInvestigation(
-        schema.tableName,
-        targetM,
-        targetD,
-        question || userQuestion
-      );
-      if (res.success && res.report) {
-        setReport(res.report);
-      }
-    } catch (err) {
-      console.error('Diagnostic investigation failed:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -485,14 +482,14 @@ export default function DiagnosticAgentPanel({ schema }: DiagnosticAgentPanelPro
                                 d.impact === 'drag'
                                   ? 'rgba(239, 68, 68, 0.15)'
                                   : d.impact === 'boost'
-                                  ? 'rgba(16, 185, 129, 0.15)'
-                                  : 'rgba(148, 163, 184, 0.15)',
+                                    ? 'rgba(16, 185, 129, 0.15)'
+                                    : 'rgba(148, 163, 184, 0.15)',
                               color:
                                 d.impact === 'drag'
                                   ? '#f87171'
                                   : d.impact === 'boost'
-                                  ? '#34d399'
-                                  : '#94a3b8',
+                                    ? '#34d399'
+                                    : '#94a3b8',
                               padding: '2px 8px',
                               borderRadius: 6,
                               fontSize: 11,

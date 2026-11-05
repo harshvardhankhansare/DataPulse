@@ -94,17 +94,16 @@ export async function detectPii(
     }
 
     // 2. Sample values from DuckDB
-    let sampleRows: any[] = [];
+    let sampleValues: string[];
     try {
-      sampleRows = await queryFn(`SELECT ${escCol} AS val FROM ${escTable} WHERE ${escCol} IS NOT NULL LIMIT 40`);
+      const rows = await queryFn(`SELECT ${escCol} AS val FROM ${escTable} WHERE ${escCol} IS NOT NULL LIMIT 40`);
+      sampleValues = rows
+        .map(r => (r.val !== null && r.val !== undefined ? String(r.val).trim() : ''))
+        .filter(v => v.length > 0);
     } catch (e) {
       console.warn(`[PII Detector] Failed to sample column ${colName}:`, e);
       continue;
     }
-
-    const sampleValues = sampleRows
-      .map(r => (r.val !== null && r.val !== undefined ? String(r.val).trim() : ''))
-      .filter(v => v.length > 0);
 
     if (sampleValues.length === 0) continue;
 
@@ -138,7 +137,7 @@ export async function detectPii(
         }
       }
 
-      let confidence: PiiConfidence = 'low';
+      let confidence: PiiConfidence;
       if (headerMatched && valueMatchCount > 0) {
         confidence = 'high';
       } else if (headerMatched || valueMatchCount / sampleValues.length >= 0.4) {

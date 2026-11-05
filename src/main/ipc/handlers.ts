@@ -13,6 +13,7 @@ import { registerDiagnosticHandlers } from './diagnosticHandlers.js';
 import { registerReportingHandlers } from './reportingHandlers.js';
 import { registerLakehouseHandlers } from './lakehouseHandlers.js';
 import { registerEditorHandlers } from './editorHandlers.js';
+import { registerPersistenceHandlers } from './persistenceHandlers.js';
 
 export function registerIpcHandlers() {
   const handleSelectFile = async (event: Electron.IpcMainInvokeEvent) => {
@@ -20,9 +21,9 @@ export function registerIpcHandlers() {
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile'],
       filters: [
-        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'xls', 'json', 'parquet'] },
+        { name: 'Supported Datasets (CSV, Excel, JSON, Parquet)', extensions: ['csv', 'xlsx', 'json', 'parquet'] },
         { name: 'CSV files', extensions: ['csv'] },
-        { name: 'Excel Spreadsheets', extensions: ['xlsx', 'xls'] },
+        { name: 'Excel Spreadsheets', extensions: ['xlsx'] },
         { name: 'JSON files', extensions: ['json'] },
         { name: 'Parquet files', extensions: ['parquet'] },
         { name: 'All files', extensions: ['*'] },
@@ -33,17 +34,23 @@ export function registerIpcHandlers() {
   };
 
   ipcMain.handle('select-file', handleSelectFile);
-  ipcMain.handle('select-csv-file', handleSelectFile);
 
   const handleImportFile = async (_event: Electron.IpcMainInvokeEvent, filePath: string) => {
     try {
       const tableName = 'imported_data';
 
-      // First, drop the table if it exists (for re-imports)
+      // First, drop the table and any previous undo snapshots if they exist (for re-imports)
       try {
-        await query(`DROP TABLE IF EXISTS ${tableName}`);
+        await query(`DROP TABLE IF EXISTS "${tableName}"`);
+        const tables = await query('SHOW TABLES');
+        for (const row of tables) {
+          const name = String((row as Record<string, unknown>).name || (row as Record<string, unknown>).tableName || Object.values(row)[0] || '');
+          if (name.startsWith(`${tableName}__undo_`)) {
+            await query(`DROP TABLE IF EXISTS "${name}"`);
+          }
+        }
       } catch {
-        // Ignore errors if table doesn't exist
+        // Ignore errors if table/snapshots don't exist
       }
 
       // Import the file using unified multi-format importer
@@ -69,7 +76,6 @@ export function registerIpcHandlers() {
   };
 
   ipcMain.handle('import-file', handleImportFile);
-  ipcMain.handle('import-csv', handleImportFile);
 
   registerAnalyticsHandlers(query);
   registerAiHandlers(query);
@@ -79,4 +85,5 @@ export function registerIpcHandlers() {
   registerReportingHandlers(query);
   registerLakehouseHandlers(query);
   registerEditorHandlers(query);
+  registerPersistenceHandlers();
 }

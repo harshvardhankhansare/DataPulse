@@ -20,9 +20,15 @@ export async function importFile(
     return { format: 'csv' };
   }
 
-  if (ext === 'xlsx' || ext === 'xls') {
+  if (ext === 'xlsx') {
     await importXlsx(filePath, tableName, queryFn);
     return { format: ext };
+  }
+
+  if (ext === 'xls') {
+    throw new Error(
+      'Legacy .xls files are not supported. Please re-save the file as .xlsx (modern Excel format) and try again.'
+    );
   }
 
   if (ext === 'json') {

@@ -6,6 +6,8 @@ directories:
 files:
   - dist/**/*
   - package.json
+  - node_modules/duckdb/lib/binding/duckdb.node
 win:
   target:
     - nsis
+  asar: false

@@ -1,5 +1,3 @@
-import { TableSchema } from '../schema/schemaTypes.js';
-
 export interface SqlValidationResult {
   valid: boolean;
   cleanSql?: string;
@@ -27,7 +25,7 @@ export function extractSqlFromText(rawText: string): string {
   return text;
 }
 
-export function validateSql(rawSql: string, tableName: string, _schema: TableSchema): SqlValidationResult {
+export function validateSql(rawSql: string, tableName: string): SqlValidationResult {
   const cleanSql = extractSqlFromText(rawSql);
 
   if (!cleanSql) {

@@ -1,10 +1,8 @@
-const { contextBridge, ipcRenderer } = require('electron');
+import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electron', {
   selectFile: () => ipcRenderer.invoke('select-file'),
-  selectCsvFile: () => ipcRenderer.invoke('select-file'),
   importFile: (filePath: string) => ipcRenderer.invoke('import-file', filePath),
-  importCsv: (filePath: string) => ipcRenderer.invoke('import-file', filePath),
   runAnalysis: (tableName: string, analysisType: string, filter?: any) =>
     ipcRenderer.invoke('run-analysis', tableName, analysisType, filter),
   checkAiStatus: (customUrl?: string) =>
@@ -49,8 +47,6 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('lakehouse:select-files'),
   importMultipleFiles: (filePaths: string[]) =>
     ipcRenderer.invoke('lakehouse:import-files', filePaths),
-  detectJoinCandidates: (tables: any[]) =>
-    ipcRenderer.invoke('lakehouse:detect-joins', tables),
   createJoinView: (plan: any) =>
     ipcRenderer.invoke('lakehouse:create-join-view', plan),
   getTableRows: (tableName: string, limit?: number, offset?: number, search?: string) =>
@@ -63,5 +59,15 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('editor:clean-data', tableName, action),
   exportCleanedCsv: (tableName: string, defaultName?: string) =>
     ipcRenderer.invoke('editor:export-csv', tableName, defaultName),
+  saveProject: (activeTable: string, fileName: string | null) =>
+    ipcRenderer.invoke('persistence:save-project', activeTable, fileName),
+  openProject: () =>
+    ipcRenderer.invoke('persistence:open-project'),
+  undo: (tableName: string) =>
+    ipcRenderer.invoke('editor:undo', tableName),
+  getUndoStatus: (tableName: string) =>
+    ipcRenderer.invoke('editor:undo-status', tableName),
+  detectOutliers: (tableName: string) =>
+    ipcRenderer.invoke('editor:detect-outliers', tableName),
 });
 

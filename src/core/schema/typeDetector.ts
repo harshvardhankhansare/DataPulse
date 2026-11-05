@@ -54,7 +54,9 @@ export async function detectSchema(
         if (validDates >= 3 && validDates >= Math.min(samples.length, 5) * 0.7) {
           isDateString = true;
         }
-      } catch {}
+      } catch {
+        // Ignore errors in date detection - treat as not a date
+      }
 
       if (!isDateString) {
         try {
@@ -71,7 +73,9 @@ export async function detectSchema(
           if (validNums >= 2 && validNums >= Math.min(nonBlank, 5) * 0.7) {
             isNumericString = true;
           }
-        } catch {}
+        } catch {
+          // Ignore errors in date detection - treat as not a date
+        }
       }
     }
 
